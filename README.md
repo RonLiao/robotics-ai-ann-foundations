@@ -42,7 +42,7 @@ I am currently implementing an end-to-end robotic task using the **SO-101 Roboti
 
 ## 📝 Learning Journey & Blog
 For my detailed thought process, including how I apply my BSP experience to solve AI latency and control issues, check out my digital garden:
-👉 **[Link to your Super.so / Notion site here]**
+👉 **[]**
 
 ---
 
