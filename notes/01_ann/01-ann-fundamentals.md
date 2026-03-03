@@ -12,7 +12,7 @@ Sync to GitHub: No
             - 權重（weight, w）
                 - 每一個輸入對於結果的影響程度不同，所以需要靠各自的權重來區分輸入的重要性
             
-            ![image.png](image.png)
+            ![image.png](./assets/image.png)
             
             - 偏差（bias, b）
                 - 偏壓值 b 為一個修正值，用於**調整「觸發」的門檻**
