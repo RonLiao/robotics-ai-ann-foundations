@@ -48,5 +48,5 @@ For my detailed thought process, including how I apply my BSP experience to solv
 
 ## 🤝 Let's Connect
 I'm always open to discussing **Embodied AI**, **Android BSP**, or the future of **Robotics**.
-- **GitHub:** [Your GitHub Link]
-- **Email:** [Your Email]
+- **GitHub:** [https://github.com/RonLiao]
+- **Email:** [mib.liao@gmail.com]
