@@ -20,7 +20,7 @@ Type: Note
         - 每一個輸入對於結果的影響程度不同，所以需要靠各自的權重來區分輸入的重要性
         
     
-    ![image.png](image.png)
+    ![image.png](./assets/image.png)
     
     - 偏差（bias, b）
         - 偏壓值 b 為一個修正值，用於**調整「觸發」的門檻**
@@ -65,24 +65,24 @@ Type: Note
                 
         - 常用的激活函數比較
             
-            ![image.png](image%201.png)
+            ![image.png](./assets/image%201.png)
             
             - Step - [感知器(Perceptron)](https://datasciocean.tech/deep-learning-core-concept/what-is-perceptron/)
                 - Perceptron是早期的神經元
                 - 和現代神經元最大的差別是，是activation function不同
                 
-                ![image.png](image%202.png)
+                ![image.png](./assets/image%202.png)
                 
-                ![image.png](image%203.png)
+                ![image.png](./assets/image%203.png)
                 
             - [Sigmoid Neuron](https://datasciocean.tech/deep-learning-core-concept/understand-sigmoid-neuron/)
                 
-                ![image.png](image%204.png)
+                ![image.png](./assets/image%204.png)
                 
                 - 目標：將 Neural Network 中的某一個參數 w 進行「微幅」調整 (加上 ∆w)，Neural Network 的輸出也能夠「微幅」的變動 (加上 ∆output)
                     - 相較於前面感知元的劇烈變化（從0變成1或反之）
                     
-                    ![image.png](image%205.png)
+                    ![image.png](./assets/image%205.png)
                     
                 - 修改：輸入和輸出是一個 0 到 1 連續分佈的任意數字，和Perceptron只有0或1不同
                     - Sigmoid Neuron 會將最終的數值 (w·x + b) 通過一個 Sigmoid 函數才輸出
@@ -90,11 +90,11 @@ Type: Note
                     - Sigmoid Function 的平滑性是一個重要的特徵，因爲這個特性使得「參數」(weight 與 bias) 經過微幅的調整後，「輸出」(output) 真的也可以微幅的變動
             - Tanh
                 
-                ![image.png](image%206.png)
+                ![image.png](./assets/image%206.png)
                 
             - ReLU
                 
-                ![image.png](image%207.png)
+                ![image.png](./assets/image%207.png)
                 
     
     ⬆ [回到目錄](https://www.notion.so/Transformer-318845340908800ba259f5f11cfc0e5b?pvs=21)
@@ -102,7 +102,7 @@ Type: Note
 
 # 3. [神經網路(Artificial Neural Network)](https://datasciocean.tech/deep-learning-core-concept/understand-neural-network-for-deep-learning/)
 
-![image.png](image%208.png)
+![image.png](./assets/image%208.png)
 
 ## 3.1 Input Layer
 
@@ -219,7 +219,7 @@ Type: Note
         
         - **問題在於：** Sigmoid 的導數（變化率）最大只有 **0.25**。
             
-            ![image.png](image%209.png)
+            ![image.png](./assets/image%209.png)
             
         - **數學災難：** 當你把一堆小於 1 的數字連續相乘，結果會怎樣？
             - $0.25 \times 0.25 \times 0.25 \times \dots$
@@ -234,7 +234,7 @@ Type: Note
     3. **深度的意義喪失：** 你加了 100 層，結果效果跟 3 層一樣，甚至更差。
 - **它是如何被解決的？**
     
-    ![image.png](image%2010.png)
+    ![image.png](./assets/image%2010.png)
     
     這個問題的解決，直接引爆了 2012 年後的深度學習革命。主要功臣有兩位：
     
@@ -243,7 +243,7 @@ Type: Note
         - **病因：** 當時主流使用的是 **Sigmoid** 函數，它的導數最大只有 **0.25** 。這導致梯度在反向傳播時，每過一層就至少衰減 75% 。層數一多，梯度直接變成 0，網路前端癱瘓
         - **解藥：** **ReLU** 的出現。它的導數在正數區是 **1**
             
-            ![image.png](image%2011.png)
+            ![image.png](./assets/image%2011.png)
             
             - 數學意義： $1 \times 1 \times 1 \dots = 1$
             - 結果：這讓梯度可以「活著」傳回第一層
@@ -354,7 +354,7 @@ Type: Note
 
 - **核心架構：**MLP 的架構如圖，相比於感知機引入了Hidden Layer
     
-    ![image.png](image%208.png)
+    ![image.png](./assets/image%208.png)
     
     - **輸入層 (Input Layer)：**
         - 負責接收原始資料。例如輸入是一張圖片時，圖片的每一個像素 (pixel) 就對應一個輸入神經元
@@ -773,7 +773,7 @@ Type: Note
     - ResNet 修改了訊號的傳遞路徑，透過建立**捷徑**，確保即使網路疊到 100 層甚至 1000 層，訊號（梯度）也能暢通無阻地傳遞，不會中途消失 。這讓深度學習真正能夠變得「深」
     - 從下圖可觀察到，ImageNet比賽中，網路的層數從2014年GoogLeNet的22層爆增到2015年ResNet的152層，足足多了130層
 
-![image.png](image%2012.png)
+![image.png](./assets/image%2012.png)
 
 ⬆ [回到目錄](https://www.notion.so/Transformer-318845340908800ba259f5f11cfc0e5b?pvs=21)
 
@@ -872,7 +872,7 @@ Type: Note
 
 ## 7.2 架構：Transformer
 
-![image.png](image%2013.png)
+![image.png](./assets/image%2013.png)
 
 - **核心目標：拋棄循環，擁抱平行**
     
@@ -979,13 +979,13 @@ Type: Note
             - 以此例而言，因為animal和tired權重遠高於其他token，因此最終得到的 **it** 的新向量( $b^2$ )表示就不再只是一個代名詞，而是包含了「這是一隻累壞的動物」的資訊
                 - $\boldsymbol{b}^2 = \sum_{i} \alpha'_{2,i} \boldsymbol{v}^i$
         
-        ![image.png](image%2014.png)
+        ![image.png](./assets/image%2014.png)
         
-        ![image.png](image%2015.png)
+        ![image.png](./assets/image%2015.png)
         
-        ![image.png](image%2016.png)
+        ![image.png](./assets/image%2016.png)
         
-        ![image.png](image%2017.png)
+        ![image.png](./assets/image%2017.png)
         
         想像一句話：「**The animal didn't cross the street because it was too tired.**」
         
@@ -1139,11 +1139,11 @@ Type: Note
                 - 假設訓練出來的 $W^O$ 是單位矩陣（比較好算），那最終輸出就是：
                     - $b^i = [0, 5, 1, 1]$
             
-            ![image.png](image%2018.png)
+            ![image.png](./assets/image%2018.png)
             
-            ![image.png](image%2019.png)
+            ![image.png](./assets/image%2019.png)
             
-            ![image.png](image%2020.png)
+            ![image.png](./assets/image%2020.png)
             
         - **為什麼要這麼麻煩？（直觀意義）**
             
@@ -1199,7 +1199,7 @@ Type: Note
             
             Transformer 使用 正弦 (Sin) 和 餘弦 (Cos) 函數來生成這些號碼牌
             
-            ![image.png](image%2021.png)
+            ![image.png](./assets/image%2021.png)
             
             - pos：即位置
             - 2i：向量內偶數的元素
