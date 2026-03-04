@@ -1,0 +1,3 @@
+# Agent context and configuration
+.agent/
+.env
