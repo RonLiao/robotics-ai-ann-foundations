@@ -42,11 +42,20 @@ I am currently implementing an end-to-end robotic task using the **SO-101 Roboti
 
 ## 📝 Learning Journey & Blog
 For my detailed thought process, including how I apply my BSP experience to solve AI latency and control issues, check out my digital garden:
-👉 **[]**
+👉 **[Insert Your Blog Link Here]**
 
 ---
 
 ## 🤝 Let's Connect
 I'm always open to discussing **Embodied AI**, **Android BSP**, or the future of **Robotics**.
-- **GitHub:** [https://github.com/RonLiao]
-- **Email:** [mib.liao@gmail.com]
+- **GitHub:** [https://github.com/RonLiao](https://github.com/RonLiao)
+- **Email:** [mib.liao@gmail.com](mailto:mib.liao@gmail.com)
+
+---
+
+## ⚖️ Disclaimer & Attribution
+This repository is intended for **non-commercial, personal educational purposes** only. 
+
+* **Content Attribution:** Some technical notes exported from Notion may include diagrams, formulas, or images sourced from academic papers, online courses (e.g., Stanford CS231n), or technical blogs (e.g., iT Help). All copyrights belong to their respective original authors.
+* **Fair Use:** The use of such materials is intended to fall under the "Fair Use" doctrine for education and research.
+* **Takedown Requests:** If you are the owner of any content used here and would like it to be removed or credited differently, please open an [Issue](https://github.com/RonLiao/robotics-ai-ann-foundations/issues). I will take immediate action to address your concerns.
