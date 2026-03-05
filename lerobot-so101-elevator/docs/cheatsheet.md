@@ -26,6 +26,10 @@ cd lerobot/src/lerobot/scripts/
 
 ## 手臂檢查與校正 (Calibration)
 
+在 Server 48 (Docker) 上的原始校正檔路徑：
+- Follower Arm: `~/.cache/huggingface/lerobot/calibration/robots/so101_follower/my_awesome_follower_arm.json`
+- Leader Arm: `~/.cache/huggingface/lerobot/calibration/teleoperators/so101_leader/my_awesome_leader_arm.json`
+
 重新校正手臂：
 ```bash
 lerobot-calibrate --teleop.type=so101_leader --teleop.port=/dev/ttyACM0 --teleop.id=my_awesome_leader_arm

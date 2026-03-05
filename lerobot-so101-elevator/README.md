@@ -14,6 +14,7 @@
 
 - `docs/`：放置實作過程的筆記、疑難排解記錄與備忘命令集。
     - `cheatsheet.md`: 常用腳本與啟動命令備忘錄。
+- `configs/`：放置機器人馬達校正檔 (`calibration/`) 與訓練參數配置。
 - `scripts/`：預計放置後續用於資料收集、訓練與推論的啟動腳本。
 - `data/`：預計放置收集到的 hdf5 格式 demonstration 數據。
 - **Hugging Face Dataset**: [RonLiao/lerobot-so101-elevator-dataset](https://huggingface.co/datasets/RonLiao/lerobot-so101-elevator-dataset)

@@ -16,6 +16,9 @@
 
 進行雙臂的遙控操作前，須完成 Leader Arm 與 Follower Arm 的校正。
 
+- **Server 48 (Docker) 原始校正檔路徑**：
+    - Follower: `~/.cache/huggingface/lerobot/calibration/robots/so101_follower/my_awesome_follower_arm.json`
+    - Leader: `~/.cache/huggingface/lerobot/calibration/teleoperators/so101_leader/my_awesome_leader_arm.json`
 - **硬體確認**：可以透過建立虛擬 ID 用 `lerobot-calibrate` 快速確認手臂是否處於連線狀態。
 - **異常問題追蹤（重要）**：
   Leader Arm 的 `wrist_roll` 關節（手把旋轉）馬達存在異常。目前觀察到，同樣的物理角度，在每次重開機後回報的 raw data 都不同，該馬達的角度疑似在開機時會被重設為 2048。這可能會影響資料錄製時動作的精確對應，需持續追蹤。
