@@ -16,6 +16,7 @@
     - `cheatsheet.md`: 常用腳本與啟動命令備忘錄。
 - `scripts/`：預計放置後續用於資料收集、訓練與推論的啟動腳本。
 - `data/`：預計放置收集到的 hdf5 格式 demonstration 數據。
+- **Hugging Face Dataset**: [RonLiao/lerobot-so101-elevator-dataset](https://huggingface.co/datasets/RonLiao/lerobot-so101-elevator-dataset)
 
 ## 當前狀態
 
