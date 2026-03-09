@@ -63,7 +63,7 @@ lerobot-teleoperate \
 
 ```
 
-連動測試 (含相機，準備數據錄製)：
+連動測試 (含相機)：
 ```bash
 lerobot-teleoperate \
   --teleop.type=so101_leader \
