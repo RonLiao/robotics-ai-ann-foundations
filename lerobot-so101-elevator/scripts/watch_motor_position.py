@@ -22,6 +22,15 @@ def read_packet(ser, servo_id, address, length):
             return list(response[5:-1])
     return None
 
+MOTOR_NAMES = {
+    1: "shoulder_pan",
+    2: "shoulder_lift",
+    3: "elbow_flex",
+    4: "wrist_flex",
+    5: "wrist_roll",
+    6: "gripper"
+}
+
 def main():
     parser = argparse.ArgumentParser(description='Watch Feetech STS3215 motor position in real-time.')
     parser.add_argument('--port', type=str, required=True, help='Serial port (e.g., /dev/ttyACM0)')
@@ -36,6 +45,7 @@ def main():
         while True:
             output_str = "\r"
             for motor_id in args.ids:
+                name = MOTOR_NAMES.get(motor_id, "unknown")
                 # Address 56 is Current Position (2 bytes)
                 pos_data = read_packet(ser, motor_id, 56, 2)
                 if pos_data and len(pos_data) >= 2:
@@ -45,9 +55,9 @@ def main():
                     if position > 32767:
                         position -= 65536
                         
-                    output_str += f"ID {motor_id}: {position:5d} | "
+                    output_str += f"{name}({motor_id}): {position:5d} | "
                 else:
-                    output_str += f"ID {motor_id}: Error | "
+                    output_str += f"{name}({motor_id}): Error | "
                     
             sys.stdout.write(output_str)
             sys.stdout.flush()

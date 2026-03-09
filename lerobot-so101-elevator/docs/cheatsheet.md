@@ -36,10 +36,11 @@ lerobot-calibrate --teleop.type=so101_leader --teleop.port=/dev/ttyACM0 --teleop
 lerobot-calibrate --robot.type=so101_follower --robot.port=/dev/ttyACM1 --robot.id=my_awesome_follower_arm
 ```
 
-快速確認手臂是否連接 (測試用 ID)：
+快速確認手臂是否連接 (實時讀取所有馬達)：
+註：請勿再執行lerobot-calibrate，否則會打亂馬達的初始角度
 ```bash
-lerobot-calibrate --teleop.type=so101_leader --teleop.port=/dev/ttyACM0 --teleop.id=test_leader
-lerobot-calibrate --robot.type=so101_follower --robot.port=/dev/ttyACM1 --robot.id=test_follower
+python scripts/watch_motor_position.py --port /dev/ttyACM0
+python scripts/watch_motor_position.py --port /dev/ttyACM1
 ```
 
 ## 相機與連動測試
@@ -60,14 +61,4 @@ lerobot-teleoperate \
   --robot.id=my_awesome_follower_arm
 ```
 
-連動測試 (結合前置相機，準備數據錄製)：
-```bash
-lerobot-teleoperate \
-  --teleop.type=so101_leader \
-  --teleop.port=/dev/ttyACM0 \
-  --teleop.id=my_awesome_leader_arm \
-  --robot.type=so101_follower \
-  --robot.port=/dev/ttyACM1 \
-  --robot.id=my_awesome_follower_arm \
-  --robot.cameras="{front: {type: opencv, index_or_path: 0, width: 160, height: 120, fps: 20}}"
 ```
