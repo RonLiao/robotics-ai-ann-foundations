@@ -37,7 +37,7 @@ lerobot-calibrate --robot.type=so101_follower --robot.port=/dev/ttyACM1 --robot.
 ```
 
 快速確認手臂是否連接 (實時讀取所有馬達)：
-註：請勿再執行lerobot-calibrate，否則會打亂馬達的初始角度
+  註：請勿再執行lerobot-calibrate，否則會打亂馬達的初始角度
 ```bash
 python scripts/watch_motor_position.py --port /dev/ttyACM0
 python scripts/watch_motor_position.py --port /dev/ttyACM1
@@ -61,4 +61,16 @@ lerobot-teleoperate \
   --robot.id=my_awesome_follower_arm
 ```
 
+```
+
+連動測試 (含相機，準備數據錄製)：
+```bash
+lerobot-teleoperate \
+  --teleop.type=so101_leader \
+  --teleop.port=/dev/ttyACM0 \
+  --teleop.id=my_awesome_leader_arm \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=my_awesome_follower_arm \
+  --robot.cameras="{front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}"
 ```
