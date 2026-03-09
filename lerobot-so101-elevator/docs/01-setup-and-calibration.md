@@ -21,7 +21,8 @@
     - Leader: `~/.cache/huggingface/lerobot/calibration/teleoperators/so101_leader/my_awesome_leader_arm.json`
 - **硬體確認**：可以透過建立虛擬 ID 用 `lerobot-calibrate` 快速確認手臂是否處於連線狀態。
 - **異常問題追蹤（重要）**：
-  Leader Arm 的 `wrist_roll` 關節（手把旋轉）馬達存在異常。目前觀察到，同樣的物理角度，在每次重開機後回報的 raw data 都不同，該馬達的角度疑似在開機時會被重設為 2048。這可能會影響資料錄製時動作的精確對應，需持續追蹤。
+  Leader Arm 的 `wrist_roll` 關節（手把旋轉）馬達存在異常。目前觀察到，同樣的物理角度，在每次重開機後若**執行 `lerobot-calibrate`**，回報的 raw data 會產生嚴重偏移。
+    - **實驗結論**：利用 `watch_motor_position.py` 實時讀取馬達暫存器證實，**只要不執行 `lerobot-calibrate`**，即使拔插電源（Power Cycle），馬達讀值依然會保持原有的絕對位置。因此，這個異常**不會影響**後續的演示錄製（Data Collection）與推論任務。
 
 ## 3. 面臨的下一步工作
 

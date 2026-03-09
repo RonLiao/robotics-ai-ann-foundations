@@ -24,6 +24,5 @@
 1. 已設定馬達 ID 和校正，可達成兩隻手臂連動。
     - **Wrist Roll 關節問題觀測紀錄 (2026-03-05)**：
         - *現象描述*：Leader Arm 的 `wrist_roll` 關節在校正時，讀取的 MIN/MAX 範圍會隨初始啟動角度不同而產生劇烈偏移，甚至出現負值或大於 4095 的情況。
-        - *待驗證目標*：確認此偏移是否會導致機械手臂重新上電（Power Cycle）後，其讀值範圍與校正時錄製的範圍不一致，進而導致校正失效。
-        - *開發工具*：已開發 [`read_motor_info.py`](lerobot-so101-elevator/scripts/read_motor_info.py) 用於直接讀取馬達內部暫存器狀態，以確認其實際運行模式（Mode 0 或 Mode 4）。
+        - *驗證結論*：已透過 `watch_motor_position.py` 確認，只要不執行 `lerobot-calibrate`，馬達重新上電後中心和兩極限角度皆會**保持不變**。因此不影響訓練和推論階段的使用，可利用 `read_motor_info.py` 輔助觀察。
 2. 已確認相機與兩手遙控指令運作正常。
