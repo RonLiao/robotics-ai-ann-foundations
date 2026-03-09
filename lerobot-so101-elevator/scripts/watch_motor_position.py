@@ -42,8 +42,12 @@ def main():
         ser = serial.Serial(args.port, 1000000, timeout=0.1)
         print(f"Monitoring Motor IDs {args.ids} on {args.port}. Press Ctrl+C to stop.")
         
+        # 預先印出足夠的換行，避免覆寫到上面的輸出
+        print("\n" * (len(args.ids) - 1))
+        
         while True:
-            output_str = "\r"
+            # \033[NA 將游標上移 N 行
+            sys.stdout.write(f"\033[{len(args.ids)}A")
             for motor_id in args.ids:
                 name = MOTOR_NAMES.get(motor_id, "unknown")
                 # Address 56 is Current Position (2 bytes)
@@ -55,11 +59,11 @@ def main():
                     if position > 32767:
                         position -= 65536
                         
-                    output_str += f"{name}({motor_id}): {position:5d} | "
+                    # \033[K 負責清除該行舊文字
+                    sys.stdout.write(f"\033[K{name:>14}({motor_id}): {position:5d}\n")
                 else:
-                    output_str += f"{name}({motor_id}): Error | "
+                    sys.stdout.write(f"\033[K{name:>14}({motor_id}): Error\n")
                     
-            sys.stdout.write(output_str)
             sys.stdout.flush()
             
             time.sleep(0.05)
