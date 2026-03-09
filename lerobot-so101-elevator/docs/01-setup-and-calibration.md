@@ -26,7 +26,7 @@
 
 ## 3. 面臨的下一步工作
 
-在環境建置與連動測試成功後，目前的待辦清單：
+在環境建置與連動測試成功後，由02-practice-circle-magnet.md記錄接續的項目：
 - 錄製數據 ([資料錄製官方指引](https://huggingface.co/docs/lerobot/il_robots))
 - 進行模型訓練
 - 執行實際推論按壓任務
