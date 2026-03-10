@@ -31,16 +31,21 @@ def verify_latest_episode():
         print(f"=== {latest_file.name} 數據概況 ===")
         print(f"總幀數: {len(df)}")
         
-        # 檢查關鍵欄位
-        missing_cols = []
-        for col in ["observation.images.front", "observation.state", "action"]:
-            if col in df.columns:
+        # 檢查關鍵欄位 (支援多種可能的影像欄位命名)
+        found_cols = df.columns.tolist()
+        has_images = any(c for c in found_cols if "images" in c)
+        
+        if has_images:
+            image_col = [c for c in found_cols if "images" in c][0]
+            print(f"✅ 發現影像欄位: {image_col}")
+        else:
+            print(f"⚠ 缺失影像欄位！現有欄位: {found_cols}")
+
+        for col in ["observation.state", "action"]:
+            if col in found_cols:
                 print(f"✅ 欄位 {col} 正常")
             else:
-                missing_cols.append(col)
-        
-        if missing_cols:
-            print(f"⚠️ 缺失關鍵欄位: {missing_cols}")
+                print(f"❌ 缺失關鍵欄位: {col}")
 
         # 顯示軌跡變動確認
         if "observation.state" in df.columns:
