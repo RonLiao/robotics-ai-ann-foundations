@@ -100,7 +100,32 @@ python scripts/verify_data.py
 ```
 *(腳本將自動讀取最後一段錄製的 Parquet 檔案，並確認欄位與軌跡數據是否存在變動。)*
 
-### 3. 如何手動檢查檔案路徑
+### 3. 手動驗證與檔案提取 (Manual Verification & File Transfer)
+若容器內缺乏視覺化工具，可透過手動檢查檔案狀態或將檔案提取至 Host 端查看。
+
+#### 檢查檔案狀態
+確認檔案是否存在且大小正常 (非 0)：
+```bash
+# 檢查最新 Parquet (軌跡數據)
+ls -lh ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/data/chunk-000/
+
+# 檢查最新影片 (相機影格)
+ls -lh ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/videos/
+```
+
+#### 將錄製成果提取至 Host (在 Host 端執行)
+由於 Docker 內無法直接播放影片，需將檔案複製到 Host 端確認：
+```bash
+# 格式：docker cp [容器名]:[容器路徑] [本地路徑]
+
+# 提取整個影片目錄
+docker cp ron_so101:/root/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/videos ./videos_check
+
+# 提取特定 Parquet 數據
+docker cp ron_so101:/root/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/data/chunk-000/file-000.parquet ./
+```
+
+### 4. 如何手動檢查檔案路徑
 確認數據生成狀況：
 - Parquet 軌跡數據：`ls -l ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/data`
 - 影片影格目錄：`ls -l ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/videos`
