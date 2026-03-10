@@ -37,7 +37,7 @@ lerobot-calibrate --robot.type=so101_follower --robot.port=/dev/ttyACM1 --robot.
 ```
 
 快速確認手臂是否連接 (實時讀取所有馬達)：
-  註：請勿再執行lerobot-calibrate，否則會打亂馬達的初始角度
+*註：請勿再執行lerobot-calibrate，否則會打亂馬達的初始角度。*
 ```bash
 python scripts/watch_motor_position.py --port /dev/ttyACM0
 python scripts/watch_motor_position.py --port /dev/ttyACM1
@@ -86,16 +86,26 @@ lerobot-teleoperate \
 **執行方式：**
 ```bash
 # 賦予權限並執行
-chmod +x record_episodes.sh
-./record_episodes.sh
+chmod +x scripts/record_episodes.sh
+./scripts/record_episodes.sh
 ```
 
-### 2. 如何檢查錄製結果
-執行以下指令確認檔案是否成功生成且大小正常：
-- **查看 Parquet 數據** (軌跡數據)：`ls -l ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/data`
-- **查看影片目錄** (相機影像)：`ls -l ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/videos`
+### 2. 資料整合性驗證 (Data Verification)
+錄製完成後，執行以下腳本確認數據完整性（特別是相機影像與手臂軌跡）：
 
-### 3. 單段刪除
+**執行方式：**
+```bash
+# 執行驗證腳本 (預設檢查最新錄製的一段)
+python scripts/verify_data.py
+```
+*(腳本將自動讀取最後一段錄製的 Parquet 檔案，並確認欄位與軌跡數據是否存在變動。)*
+
+### 3. 如何手動檢查檔案路徑
+確認數據生成狀況：
+- Parquet 軌跡數據：`ls -l ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/data`
+- 影片影格目錄：`ls -l ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset/videos`
+
+### 4. 單段刪除
 用於修正特定錄壞之片段 (如 Episode 4)：
 *註：若資料集僅剩最後一段，受工具保護機制限制不可刪除，須直接清理整個目錄。*
 
@@ -105,34 +115,6 @@ lerobot-edit-dataset \
   --operation.type=delete_episodes \
   --operation.episode_indices="[4]"
 ```
-*註：括號內的 4 替換成想刪除的該段編號。刪除後，再次啟動錄製迴圈，程式會自動從缺少的編號開始續錄。
-*註：請將括號內的 4 替換成您想刪除的該段編號。刪除後，再次啟動錄製迴圈，程式會自動從缺少的編號開始續錄。*
-
-### 4. 連續自動錄製
-適合想一次錄完，中間不間斷的情境：
-```bash
-lerobot-record \
-  --robot.type=so101_follower \
-  --robot.port=/dev/ttyACM1 \
-  --robot.id=my_awesome_follower_arm \
-  --teleop.type=so101_leader \
-  --teleop.port=/dev/ttyACM0 \
-  --teleop.id=my_awesome_leader_arm \
-  --robot.cameras="{front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
-  --display_data=false \
-  --play_sounds=false \
-  --dataset.repo_id=RonLiao/lerobot-so101-elevator-dataset \
-  --dataset.num_episodes=50 \
-  --dataset.episode_time_s=10 \
-  --dataset.reset_time_s=5 \
-  --dataset.single_task="Press the circular magnet on the wall" \
-  --dataset.push_to_hub=true
-```
-
-> [!TIP]
-> **若出現 `FileExistsError` 或 `File exists` 報錯：**
-> - **想從頭錄製**：執行 `rm -rf ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-dataset` 刪除舊資料後重跑。
-> - **想續錄**：在指令末尾加上 `--resume=true`。
 
 ## WandB 與訓練監控 (Training & WandB)
 
