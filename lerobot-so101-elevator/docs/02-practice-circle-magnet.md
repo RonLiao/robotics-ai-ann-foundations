@@ -18,26 +18,23 @@
   - 前置相機：`/dev/video0` (設定為 640x480, 30fps)
 - **錄製計畫**：打算先錄製 50 個 demonstrations (episodes)。
 
-*(詳細的啟動與參數指令，已經備忘在同目錄的 `cheatsheet.md` 裡了)*
+*(詳細啟動指令備忘於 `cheatsheet.md`)*
 
 **錄製過程中的實務經驗與觀察：**
 - (待補充：實際錄製時遇到什麼困難？例如夾爪是否會遮擋視線、動作需不需要因為相機幀率而刻意放慢等)
 
 ## 第二步：設定視覺化監控 (WandB)
 
-因為是親手練模型，必須要能看到 Loss 曲線才知道模型有沒有在收斂。這裡選擇使用 LeRobot 原生支援的 **Weights & Biases (WandB)**，好處是不用去搞 Server 端的 Port Forwarding。
+採用 LeRobot 原生支援之 **Weights & Biases (WandB)** 監控訓練收斂狀況。避開 Server 端 Port Forwarding 配置。
 
-**設定步驟：**
-1. 在 [wandb.ai](https://wandb.ai) 取得帳號的 API Key。
-2. 在 Server48 的 Docker 容器中直接登入：
-   ```bash
-   wandb login
-   ```
-   (貼上 API Key 即可。之後只要開始啟動訓練，就能隨時用手機或筆電登入 WandB 看即時的 Loss 變化與收斂狀況。)
+**配置要點：**
+1. 於 [wandb.ai](https://wandb.ai) 取得 API Key。
+2. 訓練指令中啟用 `--wandb.enable=True` 以自動建立專案頁面。
+3. 之後即可在手機或其他筆電透過 WandB 儀表板隨時觀察即時 Loss 變化。
 
 ## 第三步：模型訓練 (Model Training)
 
-(待補充：紀錄實際執行的訓練腳本命令、選用的預訓練模型、Batch Size 與 Epochs 的設定，以及在 WandB 上觀察到的收斂狀況)
+(待補充：紀錄訓練腳本命令、預訓練模型選用、Batch Size/Epochs 設定及收斂情形)
 
 ## 第四步：實機推論 (Inference)
 
