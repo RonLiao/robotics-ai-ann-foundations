@@ -14,8 +14,8 @@ def verify_latest_episode():
         print(f"❌ 找不到數據目錄：{DATA_DIR}")
         return
 
-    # 取得最新的一個 Parquet 檔案
-    parquet_files = sorted(DATA_DIR.glob("episode_*.parquet"))
+    # 取得最新的一個 Parquet 檔案 (相容 episode_*.parquet 與 file-*.parquet)
+    parquet_files = sorted(DATA_DIR.glob("*.parquet"))
     if not parquet_files:
         print(f"❌ 在 {DATA_DIR} 中找不到任何 episode 檔案")
         return
