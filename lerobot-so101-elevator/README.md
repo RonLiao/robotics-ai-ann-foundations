@@ -12,35 +12,36 @@
 
 ## 專案目錄結構說明
 
-- `docs/`：放置實作過程的筆記、疑難排解記錄與備忘命令集。
-    - `cheatsheet.md`: 常用腳本與啟動命令備忘錄。
+- `docs/`：實作過程的詳細筆記、各階段的操作流程與故障排除。
+    - [01-setup-and-calibration.md](docs/01-setup-and-calibration.md)：環境建置、Docker 設定與手臂校正筆記。
+    - [02-practice-circle-magnet.md](docs/02-practice-circle-magnet.md)：練習任務（圓形磁鐵）的錄製、訓練與推論實作紀錄。
 - `configs/`：放置機器人馬達校正檔 (`calibration/`) 與訓練參數配置。
-- `scripts/`：預計放置後續用於資料收集、訓練與推論的啟動腳本。
-- `data/`：預計放置收集到的 hdf5 格式 demonstration 數據。
+- `scripts/`：資料收集、數據驗證與監控馬達位置的工具腳本。
+- `record/`：錄製的 demonstrations 數據（.parquet 與影片）。
 - **Hugging Face Dataset**: [RonLiao/lerobot-so101-elevator-dataset](https://huggingface.co/datasets/RonLiao/lerobot-so101-elevator-dataset)
 
 ## 當前狀態
 
-1. 已設定馬達 ID 和校正，可達成兩隻手臂連動。
-    - **Wrist Roll 關節問題觀測紀錄 (2026-03-05)**：
-        - *現象描述*：Leader Arm 的 `wrist_roll` 關節在校正時，讀取的 MIN/MAX 範圍會隨初始啟動角度不同而產生劇烈偏移，甚至出現負值或大於 4095 的情況。
-        - *驗證結論*：已透過 `watch_motor_position.py` 確認，只要不執行 `lerobot-calibrate`，馬達重新上電後中心和兩極限角度皆會**保持不變**。因此不影響訓練和推論階段的使用，可利用 `read_motor_info.py` 輔助觀察。
-2. 已確認相機與兩手連動遙控指令運作正常。
+1. **環境與校正**：已建立支援 GPU 加速與 32GB Shared Memory 的 Docker 容器 (`ron_so101_v2`)。裝置權限與手臂校正檔已透過 symbolic link 連結，確保錄製與訓練一致性。
+2. **硬體觀測**：確認 Leader Arm 的 `wrist_roll` 關節異常可透過「不重複執行 `lerobot-calibrate`」來規避，詳見 [01-setup-and-calibration.md](docs/01-setup-and-calibration.md)。
 
 ## 開發規劃 (Roadmap)
 
-為了確保從資料收集到實機推論的流程順暢，本專案將任務拆分為兩個階段進行：
+本任務拆分為兩個階段進行：
 
 ### 階段一：練習任務 (按壓牆上圓形磁鐵)
-- **目標**：熟悉 LeRobot 從錄製數據、訓練模型到實際推論的完整工作流程，確保軟硬體與腳本銜接無誤。
-- **作法**：在牆面上放置圓形磁鐵模擬電梯按鈕，錄製小規模的示範資料集，並快速訓練一個能夠執行按壓動作的初階 ACT 模型。
-- **當前進度與下次接續點 (2026-03-10 更新)**：
+- **目標**：熟悉 LeRobot 完整工作流程，確保從錄製、訓練到推論的軟硬體工作正常。
+- **當前進度 (2026-03-12 更新)**：
   - **[已完成]** 兩隻手臂與前置相機 (640x480) 的遠端遙控連動測試。
   - **[已完成]** 註冊 [wandb.ai](https://wandb.ai) 取得 API Key 並於 Server48 登入，準備開始訓練與監控 Loss 曲線。
-  - **[已完成]** 完成 50 個磁鐵按壓數據 (Episodes) 的錄製與整合性驗證。
-  - **[下一步 1]** 執行 `wandb login` 登入即時監控儀表板。
-  - **[下一步 2]** 執行 `lerobot-train` 啟動 ACT 模型訓練並監控 Loss 曲線。
+  - **[已完成]** 錄制 50 個 Episodes
+  - **[已完成]** 重建Docker容器，增加容器的ShareMemory和GPU支援
+  - **[已完成]** 整合救回的 50 個 Episodes
+  - **[已完成]** 數據存放於新容器快取路徑，並與 Hugging Face 帳號完成認證連線。
+  - **[已完成]** 執行 `wandb login` 登入即時監控儀表板。
+  - **[進行中]** 執行 `lerobot-train` 啟動 ACT 模型訓練。
+  - **[進行中]** 利用 WandB 監控 Loss 曲線 (已從 6.8 穩定收斂至 2.4 以下)。
 
 ### 階段二：正式任務 (通用電梯按壓)
-- **目標**：收集大量且具備多樣性的真實電梯按壓數據，訓練出具備強大泛化能力 (Generalization) 的通用模型。
-- **作法**：整理並上傳正式資料至 Hugging Face，調整超參數訓練完整大模型，並完成泛化能力的評估。
+- **目標**：收集具備多樣性的真實電梯數據，訓練具備泛化能力的通用模型。
+- **作法**：上傳正式資料至 Hugging Face，調整超參數訓練大模型，並評估不同電梯面板的按壓成功率。
