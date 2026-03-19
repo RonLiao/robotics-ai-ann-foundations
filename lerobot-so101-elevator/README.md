@@ -1,5 +1,9 @@
 # 通用電梯按鈕壓印 (General Elevator Pressing)
 
+[![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-FFD21E)](https://huggingface.co/datasets/RonLiao/lerobot-so101-elevator-dataset)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-FFD21E)](https://huggingface.co/RonLiao/so101-elevator-act)
+[![WandB Monitoring](https://img.shields.io/badge/Weights%20%26%20Biases-Monitoring-FF4654?logo=weightsandbiases)](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator)
+
 這是在 **robotics-ai-ann-foundations** 專案下，專注於具身智能（Embodied AI）實作的子項目。
 
 ## 專案目標
@@ -15,6 +19,7 @@
 - `docs/`：實作過程的詳細筆記、各階段的操作流程與故障排除。
     - [01-setup-and-calibration.md](docs/01-setup-and-calibration.md)：環境建置、Docker 設定與手臂校正筆記。
     - [02-practice-circle-magnet.md](docs/02-practice-circle-magnet.md)：練習任務（圓形磁鐵）的錄製、訓練與推論實作紀錄。
+    - [03-lerobot-framework-anatomy.md](docs/03-lerobot-framework-anatomy.md)：LeRobot 框架深度解析、資料結構與工具鏈原理。
 - `configs/`：放置機器人馬達校正檔 (`calibration/`) 與訓練參數配置。
 - `scripts/`：資料收集、數據驗證與監控馬達位置的工具腳本。
 - `record/`：錄製的 demonstrations 數據（.parquet 與影片）。
@@ -39,8 +44,11 @@
   - **[已完成]** 整合救回的 50 個 Episodes
   - **[已完成]** 數據存放於新容器快取路徑，並與 Hugging Face 帳號完成認證連線。
   - **[已完成]** 執行 `wandb login` 登入即時監控儀表板。
-  - **[進行中]** 執行 `lerobot-train` 啟動 ACT 模型訓練。
-  - **[進行中]** 利用 WandB 監控 Loss 曲線 (已從 6.8 穩定收斂至 2.4 以下)。
+  - **[已完成]** 啟動 ACT 模型訓練。
+  - **[已完成]** 利用 WandB 監控 Loss 曲線 (最終收斂至 2.4)。
+  - **[已完成]** 將錄製的 Dataset 與訓練成果同步至 Hugging Face。
+  - **[已完成]** 訓練完模型實機推論驗證測試。
+  - **[進行中]** 撰寫 [03-lerobot-framework-anatomy.md](docs/03-lerobot-framework-anatomy.md) 進行框架底層架構學習。
 
 ### 階段二：正式任務 (通用電梯按壓)
 - **目標**：收集具備多樣性的真實電梯數據，訓練具備泛化能力的通用模型。
