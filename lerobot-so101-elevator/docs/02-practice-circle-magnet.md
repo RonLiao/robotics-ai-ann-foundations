@@ -237,7 +237,7 @@ lerobot-record \
   --robot.id=my_awesome_follower_arm \
   --robot.cameras="{front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
   --policy.type=act \
-  --policy.pretrained_path ./outputs/train/act_elevator_test/checkpoints/005000/pretrained_model \
+  --policy.pretrained_path ./outputs/train/act_elevator_test/checkpoints/050000/pretrained_model \
   --dataset.repo_id=RonLiao/eval_so101_elevator_test \
   --dataset.single_task="Press the circular magnet on the wall" \
   --display_data=false \
@@ -247,7 +247,13 @@ lerobot-record \
 - **經驗：此訓練結果的推論有問題**
    - **問題描述**：推論時手臂一直無法按到目標，一直來回抖動如影片。 ![模型推論失敗(抖動問題)](assets/act_elevator_test_inferencefail.mp4)
    - **原因**：
+     1. **推論載入了未收斂的早期模型**：訓練總步數為 50,000 步，但在推論指令中 `--policy.pretrained_path` 卻指定了 `checkpoints/005000/`（僅訓練了 10%）。此時模型 Loss 尚未見底，學到的特徵還極度不穩定。
+     2. **OOD (Out-of-Distribution) 觸發 ACT 動作衝突**：筆記前段提到錄製時「缺乏不同初始角度的示範」。若推論時手臂的起始擺放位置與錄影時略有落差，模型會陷入未知的狀態。加上 ACT 使用 Temporal Ensembling（平均相鄰時間的多步預測片段），當模型不確定時，其產生相互矛盾的軌跡預測一旦被平均，就會造成給馬達的控制訊號忽左忽右，顯現為僵持與抖動。
    - **解決方法**：
+     - **對齊起始姿態與權重**：將推論指令中的路徑修改為 `checkpoints/050000/pretrained_model`。並在啟動推論前，人為介入將 Follower Arm 擺放至與最初錄製 50 個 Episodes 時「完全相同」的初始角度與位置。
+     - **驗證成功**：對齊起始姿態並載入收斂模型後，手臂已能正確按到藍色磁鐵目標。雖然仍然有些微抖動，但動作意圖已明確且能達成任務。
+     - **修正成果影片**：![模型推論成功(修正後)](assets/act_elevator_test_inferenceOK.mp4)
+     - **未來改進方向 (治本)**：如需容許手臂從任意姿勢出發皆能成功按壓，勢必需要在資料收集期刻意增加不同起始位置（偏左/右/上/下）的示範軌跡，以增強模型的泛化能力與穩定性。
 
 ## 延伸學習
 - [03-lerobot-framework-anatomy.md](03-lerobot-framework-anatomy.md)：深入探討 LeRobot 框架如何整合資料集、模型與相關工具鏈。
