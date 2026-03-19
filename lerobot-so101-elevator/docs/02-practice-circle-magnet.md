@@ -245,7 +245,7 @@ lerobot-record \
 ```
 
 - **經驗：此訓練結果的推論有問題**
-   - **問題描述**：推論時手臂一直無法按到目標，一直來回抖動如影片 <video src="assets/act_elevator_test_inferencefail.mp4" controls width="100%"></video>。
+   - **問題描述**：推論時手臂一直無法按到目標，一直來回抖動如影片。 ![模型推論失敗(抖動問題)](assets/act_elevator_test_inferencefail.mp4)
    - **原因**：
    - **解決方法**：
 
