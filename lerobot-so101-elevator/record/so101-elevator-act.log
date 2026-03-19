@@ -1,0 +1,1501 @@
+WARNING:lerobot.configs.policies:Device 'None' is not available. Switching to 'cuda'.
+INFO 2026-03-12 11:43:27 ot_train.py:163 {'batch_size': 8,
+ 'checkpoint_path': None,
+ 'dataset': {'episodes': None,
+             'image_transforms': {'enable': False,
+                                  'max_num_transforms': 3,
+                                  'random_order': False,
+                                  'tfs': {'affine': {'kwargs': {'degrees': [-5.0,
+                                                                            5.0],
+                                                                'translate': [0.05,
+                                                                              0.05]},
+                                                     'type': 'RandomAffine',
+                                                     'weight': 1.0},
+                                          'brightness': {'kwargs': {'brightness': [0.8,
+                                                                                   1.2]},
+                                                         'type': 'ColorJitter',
+                                                         'weight': 1.0},
+                                          'contrast': {'kwargs': {'contrast': [0.8,
+                                                                               1.2]},
+                                                       'type': 'ColorJitter',
+                                                       'weight': 1.0},
+                                          'hue': {'kwargs': {'hue': [-0.05,
+                                                                     0.05]},
+                                                  'type': 'ColorJitter',
+                                                  'weight': 1.0},
+                                          'saturation': {'kwargs': {'saturation': [0.5,
+                                                                                   1.5]},
+                                                         'type': 'ColorJitter',
+                                                         'weight': 1.0},
+                                          'sharpness': {'kwargs': {'sharpness': [0.5,
+                                                                                 1.5]},
+                                                        'type': 'SharpnessJitter',
+                                                        'weight': 1.0}}},
+             'repo_id': 'RonLiao/lerobot-so101-elevator-dataset',
+             'revision': None,
+             'root': None,
+             'streaming': False,
+             'use_imagenet_stats': True,
+             'video_backend': 'torchcodec'},
+ 'env': None,
+ 'eval': {'batch_size': 10, 'n_episodes': 10, 'use_async_envs': False},
+ 'eval_freq': 20000,
+ 'job_name': 'act_elevator_test',
+ 'log_freq': 200,
+ 'num_workers': 4,
+ 'optimizer': {'betas': [0.9, 0.999],
+               'eps': 1e-08,
+               'grad_clip_norm': 10.0,
+               'lr': 1e-05,
+               'type': 'adamw',
+               'weight_decay': 0.0001},
+ 'output_dir': 'outputs/train/act_elevator_test',
+ 'policy': {'chunk_size': 100,
+            'device': 'cuda',
+            'dim_feedforward': 3200,
+            'dim_model': 512,
+            'dropout': 0.1,
+            'feedforward_activation': 'relu',
+            'input_features': {},
+            'kl_weight': 10.0,
+            'latent_dim': 32,
+            'license': None,
+            'n_action_steps': 100,
+            'n_decoder_layers': 1,
+            'n_encoder_layers': 4,
+            'n_heads': 8,
+            'n_obs_steps': 1,
+            'n_vae_encoder_layers': 4,
+            'normalization_mapping': {'ACTION': <NormalizationMode.MEAN_STD: 'MEAN_STD'>,
+                                      'STATE': <NormalizationMode.MEAN_STD: 'MEAN_STD'>,
+                                      'VISUAL': <NormalizationMode.MEAN_STD: 'MEAN_STD'>},
+            'optimizer_lr': 1e-05,
+            'optimizer_lr_backbone': 1e-05,
+            'optimizer_weight_decay': 0.0001,
+            'output_features': {},
+            'pre_norm': False,
+            'pretrained_backbone_weights': 'ResNet18_Weights.IMAGENET1K_V1',
+            'pretrained_path': None,
+            'private': None,
+            'push_to_hub': True,
+            'replace_final_stride_with_dilation': False,
+            'repo_id': 'RonLiao/so101-elevator-act',
+            'tags': None,
+            'temporal_ensemble_coeff': None,
+            'type': 'act',
+            'use_amp': False,
+            'use_vae': True,
+            'vision_backbone': 'resnet18'},
+ 'rename_map': {},
+ 'resume': False,
+ 'save_checkpoint': True,
+ 'save_freq': 5000,
+ 'scheduler': None,
+ 'seed': 1000,
+ 'steps': 50000,
+ 'use_policy_training_preset': True,
+ 'wandb': {'disable_artifact': False,
+           'enable': True,
+           'entity': None,
+           'mode': None,
+           'notes': None,
+           'project': 'lerobot-so101-elevator',
+           'run_id': None}}
+INFO 2026-03-12 11:43:29 db_utils.py:102 Logs will be synced with wandb.
+INFO 2026-03-12 11:43:29 db_utils.py:103 Track this run --> https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator/runs/q32bp97v
+INFO 2026-03-12 11:43:29 ot_train.py:183 Creating dataset
+INFO 2026-03-12 11:43:29 ot_train.py:202 Creating policy
+INFO 2026-03-12 11:43:30 ot_train.py:247 Creating optimizer and scheduler
+INFO 2026-03-12 11:43:30 ot_train.py:259 Output dir: outputs/train/act_elevator_test
+INFO 2026-03-12 11:43:30 ot_train.py:262 cfg.steps=50000 (50K)
+INFO 2026-03-12 11:43:30 ot_train.py:263 dataset.num_frames=13947 (14K)
+INFO 2026-03-12 11:43:30 ot_train.py:264 dataset.num_episodes=51
+INFO 2026-03-12 11:43:30 ot_train.py:267 Effective batch size: 8 x 1 = 8
+INFO 2026-03-12 11:43:30 ot_train.py:268 num_learnable_params=51597190 (52M)
+INFO 2026-03-12 11:43:30 ot_train.py:269 num_total_params=51597190 (52M)
+INFO 2026-03-12 11:43:30 ot_train.py:324 Start offline training on a fixed dataset
+INFO 2026-03-12 11:44:09 ot_train.py:351 step:200 smpl:2K ep:6 epch:0.11 loss:6.831 grdn:159.717 lr:1.0e-05 updt_s:0.186 data_s:0.012
+INFO 2026-03-12 11:44:44 ot_train.py:351 step:400 smpl:3K ep:12 epch:0.23 loss:2.875 grdn:85.778 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:45:19 ot_train.py:351 step:600 smpl:5K ep:18 epch:0.34 loss:2.426 grdn:75.167 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:45:54 ot_train.py:351 step:800 smpl:6K ep:23 epch:0.46 loss:2.143 grdn:69.997 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:46:29 ot_train.py:351 step:1K smpl:8K ep:29 epch:0.57 loss:1.915 grdn:64.851 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:47:05 ot_train.py:351 step:1K smpl:10K ep:35 epch:0.69 loss:1.715 grdn:61.884 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 11:47:40 ot_train.py:351 step:1K smpl:11K ep:41 epch:0.80 loss:1.569 grdn:59.016 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:48:15 ot_train.py:351 step:2K smpl:13K ep:47 epch:0.92 loss:1.416 grdn:55.118 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:48:52 ot_train.py:351 step:2K smpl:14K ep:53 epch:1.03 loss:1.294 grdn:53.817 lr:1.0e-05 updt_s:0.175 data_s:0.013
+INFO 2026-03-12 11:49:27 ot_train.py:351 step:2K smpl:16K ep:59 epch:1.15 loss:1.181 grdn:50.639 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:50:02 ot_train.py:351 step:2K smpl:18K ep:64 epch:1.26 loss:1.059 grdn:47.470 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:50:38 ot_train.py:351 step:2K smpl:19K ep:70 epch:1.38 loss:0.956 grdn:44.243 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 11:51:13 ot_train.py:351 step:3K smpl:21K ep:76 epch:1.49 loss:0.872 grdn:43.515 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:51:48 ot_train.py:351 step:3K smpl:22K ep:82 epch:1.61 loss:0.790 grdn:40.565 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:52:23 ot_train.py:351 step:3K smpl:24K ep:88 epch:1.72 loss:0.716 grdn:38.442 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:52:58 ot_train.py:351 step:3K smpl:26K ep:94 epch:1.84 loss:0.659 grdn:37.224 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:53:33 ot_train.py:351 step:3K smpl:27K ep:99 epch:1.95 loss:0.596 grdn:34.598 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:54:09 ot_train.py:351 step:4K smpl:29K ep:105 epch:2.06 loss:0.548 grdn:33.207 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 11:54:44 ot_train.py:351 step:4K smpl:30K ep:111 epch:2.18 loss:0.497 grdn:31.634 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 11:55:19 ot_train.py:351 step:4K smpl:32K ep:117 epch:2.29 loss:0.461 grdn:30.193 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:55:54 ot_train.py:351 step:4K smpl:34K ep:123 epch:2.41 loss:0.426 grdn:29.457 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:56:29 ot_train.py:351 step:4K smpl:35K ep:129 epch:2.52 loss:0.390 grdn:27.206 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:57:04 ot_train.py:351 step:5K smpl:37K ep:135 epch:2.64 loss:0.370 grdn:26.539 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:57:39 ot_train.py:351 step:5K smpl:38K ep:140 epch:2.75 loss:0.345 grdn:25.758 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:58:14 ot_train.py:351 step:5K smpl:40K ep:146 epch:2.87 loss:0.329 grdn:24.798 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:58:14 ot_train.py:361 Checkpoint policy after step 5000
+INFO 2026-03-12 11:58:52 ot_train.py:351 step:5K smpl:42K ep:152 epch:2.98 loss:0.305 grdn:23.770 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 11:59:27 ot_train.py:351 step:5K smpl:43K ep:158 epch:3.10 loss:0.285 grdn:23.437 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:00:02 ot_train.py:351 step:6K smpl:45K ep:164 epch:3.21 loss:0.270 grdn:22.045 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:00:37 ot_train.py:351 step:6K smpl:46K ep:170 epch:3.33 loss:0.258 grdn:21.864 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:01:12 ot_train.py:351 step:6K smpl:48K ep:176 epch:3.44 loss:0.245 grdn:20.873 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:01:47 ot_train.py:351 step:6K smpl:50K ep:181 epch:3.56 loss:0.238 grdn:20.336 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:02:22 ot_train.py:351 step:6K smpl:51K ep:187 epch:3.67 loss:0.228 grdn:20.178 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:02:58 ot_train.py:351 step:7K smpl:53K ep:193 epch:3.79 loss:0.224 grdn:19.490 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:03:33 ot_train.py:351 step:7K smpl:54K ep:199 epch:3.90 loss:0.214 grdn:19.077 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:04:08 ot_train.py:351 step:7K smpl:56K ep:205 epch:4.02 loss:0.209 grdn:19.172 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:04:43 ot_train.py:351 step:7K smpl:58K ep:211 epch:4.13 loss:0.196 grdn:18.490 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:05:18 ot_train.py:351 step:7K smpl:59K ep:216 epch:4.24 loss:0.197 grdn:18.345 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:05:53 ot_train.py:351 step:8K smpl:61K ep:222 epch:4.36 loss:0.183 grdn:17.607 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:06:28 ot_train.py:351 step:8K smpl:62K ep:228 epch:4.47 loss:0.181 grdn:17.140 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:07:04 ot_train.py:351 step:8K smpl:64K ep:234 epch:4.59 loss:0.179 grdn:17.107 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:07:39 ot_train.py:351 step:8K smpl:66K ep:240 epch:4.70 loss:0.172 grdn:16.745 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:08:14 ot_train.py:351 step:8K smpl:67K ep:246 epch:4.82 loss:0.167 grdn:16.392 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:08:49 ot_train.py:351 step:9K smpl:69K ep:252 epch:4.93 loss:0.162 grdn:16.162 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:09:24 ot_train.py:351 step:9K smpl:70K ep:257 epch:5.05 loss:0.159 grdn:15.770 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:09:59 ot_train.py:351 step:9K smpl:72K ep:263 epch:5.16 loss:0.153 grdn:15.288 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:10:34 ot_train.py:351 step:9K smpl:74K ep:269 epch:5.28 loss:0.153 grdn:15.554 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:11:10 ot_train.py:351 step:9K smpl:75K ep:275 epch:5.39 loss:0.151 grdn:15.123 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:11:45 ot_train.py:351 step:10K smpl:77K ep:281 epch:5.51 loss:0.146 grdn:14.999 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:12:20 ot_train.py:351 step:10K smpl:78K ep:287 epch:5.62 loss:0.146 grdn:14.723 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:12:55 ot_train.py:351 step:10K smpl:80K ep:293 epch:5.74 loss:0.141 grdn:14.369 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:12:55 ot_train.py:361 Checkpoint policy after step 10000
+INFO 2026-03-12 12:13:31 ot_train.py:351 step:10K smpl:82K ep:298 epch:5.85 loss:0.141 grdn:14.207 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:14:07 ot_train.py:351 step:10K smpl:83K ep:304 epch:5.97 loss:0.137 grdn:14.259 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:14:42 ot_train.py:351 step:11K smpl:85K ep:310 epch:6.08 loss:0.133 grdn:14.350 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:15:17 ot_train.py:351 step:11K smpl:86K ep:316 epch:6.19 loss:0.129 grdn:14.151 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:15:52 ot_train.py:351 step:11K smpl:88K ep:322 epch:6.31 loss:0.128 grdn:13.972 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:16:27 ot_train.py:351 step:11K smpl:90K ep:328 epch:6.42 loss:0.128 grdn:13.574 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:17:02 ot_train.py:351 step:11K smpl:91K ep:333 epch:6.54 loss:0.125 grdn:13.331 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:17:37 ot_train.py:351 step:12K smpl:93K ep:339 epch:6.65 loss:0.126 grdn:13.347 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:18:13 ot_train.py:351 step:12K smpl:94K ep:345 epch:6.77 loss:0.121 grdn:13.319 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:18:48 ot_train.py:351 step:12K smpl:96K ep:351 epch:6.88 loss:0.122 grdn:12.853 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:19:23 ot_train.py:351 step:12K smpl:98K ep:357 epch:7.00 loss:0.122 grdn:12.772 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:19:58 ot_train.py:351 step:12K smpl:99K ep:363 epch:7.11 loss:0.114 grdn:12.622 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:20:33 ot_train.py:351 step:13K smpl:101K ep:369 epch:7.23 loss:0.114 grdn:12.375 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:21:08 ot_train.py:351 step:13K smpl:102K ep:374 epch:7.34 loss:0.111 grdn:12.156 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:21:43 ot_train.py:351 step:13K smpl:104K ep:380 epch:7.46 loss:0.114 grdn:12.253 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:22:19 ot_train.py:351 step:13K smpl:106K ep:386 epch:7.57 loss:0.109 grdn:12.074 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:22:54 ot_train.py:351 step:13K smpl:107K ep:392 epch:7.69 loss:0.109 grdn:12.127 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:23:29 ot_train.py:351 step:14K smpl:109K ep:398 epch:7.80 loss:0.107 grdn:11.726 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:24:04 ot_train.py:351 step:14K smpl:110K ep:404 epch:7.92 loss:0.103 grdn:11.733 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:24:39 ot_train.py:351 step:14K smpl:112K ep:410 epch:8.03 loss:0.105 grdn:11.592 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:25:14 ot_train.py:351 step:14K smpl:114K ep:415 epch:8.15 loss:0.101 grdn:11.475 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:25:50 ot_train.py:351 step:14K smpl:115K ep:421 epch:8.26 loss:0.101 grdn:11.267 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:26:25 ot_train.py:351 step:15K smpl:117K ep:427 epch:8.37 loss:0.100 grdn:11.031 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:27:00 ot_train.py:351 step:15K smpl:118K ep:433 epch:8.49 loss:0.097 grdn:11.153 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:27:35 ot_train.py:351 step:15K smpl:120K ep:439 epch:8.60 loss:0.098 grdn:10.832 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:27:35 ot_train.py:361 Checkpoint policy after step 15000
+INFO 2026-03-12 12:28:11 ot_train.py:351 step:15K smpl:122K ep:445 epch:8.72 loss:0.095 grdn:11.176 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:28:46 ot_train.py:351 step:15K smpl:123K ep:451 epch:8.83 loss:0.098 grdn:11.030 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:29:22 ot_train.py:351 step:16K smpl:125K ep:456 epch:8.95 loss:0.096 grdn:10.806 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:29:57 ot_train.py:351 step:16K smpl:126K ep:462 epch:9.06 loss:0.095 grdn:10.446 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:30:32 ot_train.py:351 step:16K smpl:128K ep:468 epch:9.18 loss:0.091 grdn:10.374 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:31:07 ot_train.py:351 step:16K smpl:130K ep:474 epch:9.29 loss:0.092 grdn:10.404 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:31:42 ot_train.py:351 step:16K smpl:131K ep:480 epch:9.41 loss:0.090 grdn:10.040 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:32:17 ot_train.py:351 step:17K smpl:133K ep:486 epch:9.52 loss:0.088 grdn:10.455 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:32:52 ot_train.py:351 step:17K smpl:134K ep:491 epch:9.64 loss:0.089 grdn:10.106 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:33:28 ot_train.py:351 step:17K smpl:136K ep:497 epch:9.75 loss:0.089 grdn:10.162 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:34:03 ot_train.py:351 step:17K smpl:138K ep:503 epch:9.87 loss:0.087 grdn:9.848 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:34:38 ot_train.py:351 step:17K smpl:139K ep:509 epch:9.98 loss:0.087 grdn:9.807 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:35:13 ot_train.py:351 step:18K smpl:141K ep:515 epch:10.10 loss:0.083 grdn:10.052 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:35:48 ot_train.py:351 step:18K smpl:142K ep:521 epch:10.21 loss:0.084 grdn:9.769 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:36:23 ot_train.py:351 step:18K smpl:144K ep:527 epch:10.32 loss:0.084 grdn:9.676 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:36:58 ot_train.py:351 step:18K smpl:146K ep:532 epch:10.44 loss:0.082 grdn:9.650 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:37:34 ot_train.py:351 step:18K smpl:147K ep:538 epch:10.55 loss:0.080 grdn:9.252 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:38:09 ot_train.py:351 step:19K smpl:149K ep:544 epch:10.67 loss:0.083 grdn:8.999 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:38:44 ot_train.py:351 step:19K smpl:150K ep:550 epch:10.78 loss:0.082 grdn:9.421 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:39:19 ot_train.py:351 step:19K smpl:152K ep:556 epch:10.90 loss:0.080 grdn:9.451 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:39:54 ot_train.py:351 step:19K smpl:154K ep:562 epch:11.01 loss:0.077 grdn:8.946 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:40:29 ot_train.py:351 step:19K smpl:155K ep:568 epch:11.13 loss:0.078 grdn:9.152 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:41:04 ot_train.py:351 step:20K smpl:157K ep:573 epch:11.24 loss:0.078 grdn:9.052 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:41:40 ot_train.py:351 step:20K smpl:158K ep:579 epch:11.36 loss:0.076 grdn:9.026 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:42:15 ot_train.py:351 step:20K smpl:160K ep:585 epch:11.47 loss:0.076 grdn:8.781 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:42:15 ot_train.py:361 Checkpoint policy after step 20000
+INFO 2026-03-12 12:42:51 ot_train.py:351 step:20K smpl:162K ep:591 epch:11.59 loss:0.073 grdn:8.572 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:43:26 ot_train.py:351 step:20K smpl:163K ep:597 epch:11.70 loss:0.074 grdn:8.914 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:44:01 ot_train.py:351 step:21K smpl:165K ep:603 epch:11.82 loss:0.073 grdn:8.466 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:44:37 ot_train.py:351 step:21K smpl:166K ep:608 epch:11.93 loss:0.071 grdn:8.282 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:45:12 ot_train.py:351 step:21K smpl:168K ep:614 epch:12.05 loss:0.073 grdn:8.620 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:45:47 ot_train.py:351 step:21K smpl:170K ep:620 epch:12.16 loss:0.072 grdn:8.544 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:46:22 ot_train.py:351 step:21K smpl:171K ep:626 epch:12.28 loss:0.072 grdn:8.515 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:46:57 ot_train.py:351 step:22K smpl:173K ep:632 epch:12.39 loss:0.069 grdn:8.047 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:47:32 ot_train.py:351 step:22K smpl:174K ep:638 epch:12.50 loss:0.070 grdn:8.126 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:48:07 ot_train.py:351 step:22K smpl:176K ep:644 epch:12.62 loss:0.070 grdn:8.275 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:48:42 ot_train.py:351 step:22K smpl:178K ep:649 epch:12.73 loss:0.070 grdn:8.382 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:49:18 ot_train.py:351 step:22K smpl:179K ep:655 epch:12.85 loss:0.067 grdn:7.942 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:49:53 ot_train.py:351 step:23K smpl:181K ep:661 epch:12.96 loss:0.068 grdn:7.865 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:50:28 ot_train.py:351 step:23K smpl:182K ep:667 epch:13.08 loss:0.066 grdn:8.043 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:51:03 ot_train.py:351 step:23K smpl:184K ep:673 epch:13.19 loss:0.066 grdn:7.816 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:51:38 ot_train.py:351 step:23K smpl:186K ep:679 epch:13.31 loss:0.066 grdn:7.896 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:52:13 ot_train.py:351 step:23K smpl:187K ep:685 epch:13.42 loss:0.067 grdn:7.789 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:52:48 ot_train.py:351 step:24K smpl:189K ep:690 epch:13.54 loss:0.066 grdn:7.964 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:53:24 ot_train.py:351 step:24K smpl:190K ep:696 epch:13.65 loss:0.066 grdn:7.705 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:53:59 ot_train.py:351 step:24K smpl:192K ep:702 epch:13.77 loss:0.064 grdn:7.751 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:54:34 ot_train.py:351 step:24K smpl:194K ep:708 epch:13.88 loss:0.065 grdn:7.852 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:55:09 ot_train.py:351 step:24K smpl:195K ep:714 epch:14.00 loss:0.064 grdn:7.651 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:55:44 ot_train.py:351 step:25K smpl:197K ep:720 epch:14.11 loss:0.063 grdn:7.523 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 12:56:19 ot_train.py:351 step:25K smpl:198K ep:725 epch:14.23 loss:0.063 grdn:7.488 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:56:55 ot_train.py:351 step:25K smpl:200K ep:731 epch:14.34 loss:0.061 grdn:7.595 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:56:55 ot_train.py:361 Checkpoint policy after step 25000
+INFO 2026-03-12 12:57:31 ot_train.py:351 step:25K smpl:202K ep:737 epch:14.45 loss:0.065 grdn:7.612 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:58:06 ot_train.py:351 step:25K smpl:203K ep:743 epch:14.57 loss:0.060 grdn:7.247 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:58:41 ot_train.py:351 step:26K smpl:205K ep:749 epch:14.68 loss:0.061 grdn:7.170 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 12:59:16 ot_train.py:351 step:26K smpl:206K ep:755 epch:14.80 loss:0.060 grdn:7.235 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 12:59:51 ot_train.py:351 step:26K smpl:208K ep:761 epch:14.91 loss:0.063 grdn:7.321 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:00:27 ot_train.py:351 step:26K smpl:210K ep:766 epch:15.03 loss:0.062 grdn:7.234 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:01:02 ot_train.py:351 step:26K smpl:211K ep:772 epch:15.14 loss:0.060 grdn:6.937 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:01:37 ot_train.py:351 step:27K smpl:213K ep:778 epch:15.26 loss:0.058 grdn:6.985 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:02:12 ot_train.py:351 step:27K smpl:214K ep:784 epch:15.37 loss:0.059 grdn:6.811 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:02:47 ot_train.py:351 step:27K smpl:216K ep:790 epch:15.49 loss:0.060 grdn:6.880 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:03:22 ot_train.py:351 step:27K smpl:218K ep:796 epch:15.60 loss:0.059 grdn:6.815 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:03:58 ot_train.py:351 step:27K smpl:219K ep:802 epch:15.72 loss:0.058 grdn:6.964 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:04:33 ot_train.py:351 step:28K smpl:221K ep:807 epch:15.83 loss:0.058 grdn:7.086 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:05:08 ot_train.py:351 step:28K smpl:222K ep:813 epch:15.95 loss:0.057 grdn:6.698 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:05:43 ot_train.py:351 step:28K smpl:224K ep:819 epch:16.06 loss:0.057 grdn:6.851 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:06:18 ot_train.py:351 step:28K smpl:226K ep:825 epch:16.18 loss:0.055 grdn:6.624 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:06:53 ot_train.py:351 step:28K smpl:227K ep:831 epch:16.29 loss:0.056 grdn:6.762 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:07:28 ot_train.py:351 step:29K smpl:229K ep:837 epch:16.40 loss:0.055 grdn:6.550 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:08:03 ot_train.py:351 step:29K smpl:230K ep:843 epch:16.52 loss:0.054 grdn:6.500 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:08:39 ot_train.py:351 step:29K smpl:232K ep:848 epch:16.63 loss:0.055 grdn:6.422 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:09:14 ot_train.py:351 step:29K smpl:234K ep:854 epch:16.75 loss:0.057 grdn:6.766 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:09:49 ot_train.py:351 step:29K smpl:235K ep:860 epch:16.86 loss:0.056 grdn:6.598 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:10:24 ot_train.py:351 step:30K smpl:237K ep:866 epch:16.98 loss:0.053 grdn:6.512 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:10:59 ot_train.py:351 step:30K smpl:238K ep:872 epch:17.09 loss:0.055 grdn:6.523 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:11:34 ot_train.py:351 step:30K smpl:240K ep:878 epch:17.21 loss:0.055 grdn:6.645 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:11:34 ot_train.py:361 Checkpoint policy after step 30000
+INFO 2026-03-12 13:12:11 ot_train.py:351 step:30K smpl:242K ep:883 epch:17.32 loss:0.054 grdn:6.203 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:12:46 ot_train.py:351 step:30K smpl:243K ep:889 epch:17.44 loss:0.052 grdn:6.179 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:13:21 ot_train.py:351 step:31K smpl:245K ep:895 epch:17.55 loss:0.053 grdn:6.363 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:13:56 ot_train.py:351 step:31K smpl:246K ep:901 epch:17.67 loss:0.053 grdn:6.177 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:14:32 ot_train.py:351 step:31K smpl:248K ep:907 epch:17.78 loss:0.053 grdn:6.060 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:15:07 ot_train.py:351 step:31K smpl:250K ep:913 epch:17.90 loss:0.051 grdn:6.011 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:15:42 ot_train.py:351 step:31K smpl:251K ep:919 epch:18.01 loss:0.053 grdn:6.430 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:16:17 ot_train.py:351 step:32K smpl:253K ep:924 epch:18.13 loss:0.053 grdn:6.196 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:16:52 ot_train.py:351 step:32K smpl:254K ep:930 epch:18.24 loss:0.051 grdn:6.216 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:17:27 ot_train.py:351 step:32K smpl:256K ep:936 epch:18.36 loss:0.050 grdn:5.979 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:18:02 ot_train.py:351 step:32K smpl:258K ep:942 epch:18.47 loss:0.051 grdn:5.930 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:18:37 ot_train.py:351 step:32K smpl:259K ep:948 epch:18.58 loss:0.051 grdn:6.159 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:19:13 ot_train.py:351 step:33K smpl:261K ep:954 epch:18.70 loss:0.049 grdn:6.064 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:19:48 ot_train.py:351 step:33K smpl:262K ep:960 epch:18.81 loss:0.050 grdn:5.865 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:20:23 ot_train.py:351 step:33K smpl:264K ep:965 epch:18.93 loss:0.050 grdn:5.751 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:20:58 ot_train.py:351 step:33K smpl:266K ep:971 epch:19.04 loss:0.052 grdn:6.022 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:21:33 ot_train.py:351 step:33K smpl:267K ep:977 epch:19.16 loss:0.052 grdn:6.098 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:22:08 ot_train.py:351 step:34K smpl:269K ep:983 epch:19.27 loss:0.050 grdn:5.989 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:22:44 ot_train.py:351 step:34K smpl:270K ep:989 epch:19.39 loss:0.048 grdn:5.917 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:23:19 ot_train.py:351 step:34K smpl:272K ep:995 epch:19.50 loss:0.049 grdn:5.772 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:23:54 ot_train.py:351 step:34K smpl:274K ep:1K epch:19.62 loss:0.049 grdn:5.982 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:24:29 ot_train.py:351 step:34K smpl:275K ep:1K epch:19.73 loss:0.049 grdn:5.934 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:25:04 ot_train.py:351 step:35K smpl:277K ep:1K epch:19.85 loss:0.048 grdn:5.705 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:25:39 ot_train.py:351 step:35K smpl:278K ep:1K epch:19.96 loss:0.048 grdn:5.647 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:26:14 ot_train.py:351 step:35K smpl:280K ep:1K epch:20.08 loss:0.047 grdn:5.687 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:26:14 ot_train.py:361 Checkpoint policy after step 35000
+INFO 2026-03-12 13:26:51 ot_train.py:351 step:35K smpl:282K ep:1K epch:20.19 loss:0.047 grdn:5.757 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:27:26 ot_train.py:351 step:35K smpl:283K ep:1K epch:20.31 loss:0.047 grdn:5.658 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:28:01 ot_train.py:351 step:36K smpl:285K ep:1K epch:20.42 loss:0.046 grdn:5.556 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:28:36 ot_train.py:351 step:36K smpl:286K ep:1K epch:20.53 loss:0.047 grdn:5.526 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:29:11 ot_train.py:351 step:36K smpl:288K ep:1K epch:20.65 loss:0.047 grdn:5.328 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:29:46 ot_train.py:351 step:36K smpl:290K ep:1K epch:20.76 loss:0.047 grdn:5.543 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:30:21 ot_train.py:351 step:36K smpl:291K ep:1K epch:20.88 loss:0.047 grdn:5.412 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:30:57 ot_train.py:351 step:37K smpl:293K ep:1K epch:20.99 loss:0.046 grdn:5.674 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:31:32 ot_train.py:351 step:37K smpl:294K ep:1K epch:21.11 loss:0.046 grdn:5.557 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:32:07 ot_train.py:351 step:37K smpl:296K ep:1K epch:21.22 loss:0.046 grdn:5.487 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:32:42 ot_train.py:351 step:37K smpl:298K ep:1K epch:21.34 loss:0.045 grdn:5.354 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:33:17 ot_train.py:351 step:37K smpl:299K ep:1K epch:21.45 loss:0.046 grdn:5.390 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:33:52 ot_train.py:351 step:38K smpl:301K ep:1K epch:21.57 loss:0.046 grdn:5.385 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:34:27 ot_train.py:351 step:38K smpl:302K ep:1K epch:21.68 loss:0.046 grdn:5.399 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:35:03 ot_train.py:351 step:38K smpl:304K ep:1K epch:21.80 loss:0.047 grdn:5.484 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:35:38 ot_train.py:351 step:38K smpl:306K ep:1K epch:21.91 loss:0.044 grdn:5.233 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:36:13 ot_train.py:351 step:38K smpl:307K ep:1K epch:22.03 loss:0.045 grdn:5.458 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:36:48 ot_train.py:351 step:39K smpl:309K ep:1K epch:22.14 loss:0.044 grdn:5.280 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:37:23 ot_train.py:351 step:39K smpl:310K ep:1K epch:22.26 loss:0.043 grdn:5.097 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:37:58 ot_train.py:351 step:39K smpl:312K ep:1K epch:22.37 loss:0.044 grdn:5.447 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:38:34 ot_train.py:351 step:39K smpl:314K ep:1K epch:22.49 loss:0.043 grdn:5.063 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:39:09 ot_train.py:351 step:39K smpl:315K ep:1K epch:22.60 loss:0.043 grdn:4.938 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:39:44 ot_train.py:351 step:40K smpl:317K ep:1K epch:22.71 loss:0.043 grdn:5.257 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:40:19 ot_train.py:351 step:40K smpl:318K ep:1K epch:22.83 loss:0.044 grdn:5.284 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:40:54 ot_train.py:351 step:40K smpl:320K ep:1K epch:22.94 loss:0.044 grdn:5.409 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:40:54 ot_train.py:361 Checkpoint policy after step 40000
+INFO 2026-03-12 13:41:31 ot_train.py:351 step:40K smpl:322K ep:1K epch:23.06 loss:0.044 grdn:5.139 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:42:06 ot_train.py:351 step:40K smpl:323K ep:1K epch:23.17 loss:0.043 grdn:5.019 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:42:41 ot_train.py:351 step:41K smpl:325K ep:1K epch:23.29 loss:0.043 grdn:4.963 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:43:16 ot_train.py:351 step:41K smpl:326K ep:1K epch:23.40 loss:0.042 grdn:5.028 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:43:51 ot_train.py:351 step:41K smpl:328K ep:1K epch:23.52 loss:0.042 grdn:5.198 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:44:26 ot_train.py:351 step:41K smpl:330K ep:1K epch:23.63 loss:0.043 grdn:4.987 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:45:01 ot_train.py:351 step:41K smpl:331K ep:1K epch:23.75 loss:0.042 grdn:5.062 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:45:36 ot_train.py:351 step:42K smpl:333K ep:1K epch:23.86 loss:0.041 grdn:4.856 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:46:11 ot_train.py:351 step:42K smpl:334K ep:1K epch:23.98 loss:0.043 grdn:5.044 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:46:47 ot_train.py:351 step:42K smpl:336K ep:1K epch:24.09 loss:0.042 grdn:5.089 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:47:22 ot_train.py:351 step:42K smpl:338K ep:1K epch:24.21 loss:0.041 grdn:4.832 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:47:57 ot_train.py:351 step:42K smpl:339K ep:1K epch:24.32 loss:0.041 grdn:4.781 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:48:32 ot_train.py:351 step:43K smpl:341K ep:1K epch:24.44 loss:0.041 grdn:4.765 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:49:08 ot_train.py:351 step:43K smpl:342K ep:1K epch:24.55 loss:0.042 grdn:4.797 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:49:43 ot_train.py:351 step:43K smpl:344K ep:1K epch:24.66 loss:0.041 grdn:4.983 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:50:18 ot_train.py:351 step:43K smpl:346K ep:1K epch:24.78 loss:0.041 grdn:4.815 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:50:53 ot_train.py:351 step:43K smpl:347K ep:1K epch:24.89 loss:0.041 grdn:4.976 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:51:28 ot_train.py:351 step:44K smpl:349K ep:1K epch:25.01 loss:0.041 grdn:4.822 lr:1.0e-05 updt_s:0.165 data_s:0.011
+INFO 2026-03-12 13:52:03 ot_train.py:351 step:44K smpl:350K ep:1K epch:25.12 loss:0.041 grdn:4.765 lr:1.0e-05 updt_s:0.165 data_s:0.012
+INFO 2026-03-12 13:52:39 ot_train.py:351 step:44K smpl:352K ep:1K epch:25.24 loss:0.040 grdn:4.887 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:53:14 ot_train.py:351 step:44K smpl:354K ep:1K epch:25.35 loss:0.040 grdn:4.852 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:53:49 ot_train.py:351 step:44K smpl:355K ep:1K epch:25.47 loss:0.040 grdn:4.705 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:54:24 ot_train.py:351 step:45K smpl:357K ep:1K epch:25.58 loss:0.039 grdn:4.792 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:54:59 ot_train.py:351 step:45K smpl:358K ep:1K epch:25.70 loss:0.040 grdn:4.736 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:55:34 ot_train.py:351 step:45K smpl:360K ep:1K epch:25.81 loss:0.041 grdn:4.783 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:55:34 ot_train.py:361 Checkpoint policy after step 45000
+INFO 2026-03-12 13:56:11 ot_train.py:351 step:45K smpl:362K ep:1K epch:25.93 loss:0.040 grdn:4.851 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:56:46 ot_train.py:351 step:45K smpl:363K ep:1K epch:26.04 loss:0.041 grdn:4.760 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 13:57:21 ot_train.py:351 step:46K smpl:365K ep:1K epch:26.16 loss:0.038 grdn:4.517 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:57:56 ot_train.py:351 step:46K smpl:366K ep:1K epch:26.27 loss:0.041 grdn:4.591 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:58:31 ot_train.py:351 step:46K smpl:368K ep:1K epch:26.39 loss:0.038 grdn:4.560 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 13:59:06 ot_train.py:351 step:46K smpl:370K ep:1K epch:26.50 loss:0.038 grdn:4.629 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 13:59:41 ot_train.py:351 step:46K smpl:371K ep:1K epch:26.62 loss:0.042 grdn:4.848 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:00:17 ot_train.py:351 step:47K smpl:373K ep:1K epch:26.73 loss:0.038 grdn:4.600 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:00:52 ot_train.py:351 step:47K smpl:374K ep:1K epch:26.84 loss:0.039 grdn:4.707 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:01:27 ot_train.py:351 step:47K smpl:376K ep:1K epch:26.96 loss:0.039 grdn:4.504 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:02:02 ot_train.py:351 step:47K smpl:378K ep:1K epch:27.07 loss:0.038 grdn:4.445 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 14:02:37 ot_train.py:351 step:47K smpl:379K ep:1K epch:27.19 loss:0.038 grdn:4.466 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:03:12 ot_train.py:351 step:48K smpl:381K ep:1K epch:27.30 loss:0.038 grdn:4.507 lr:1.0e-05 updt_s:0.166 data_s:0.010
+INFO 2026-03-12 14:03:47 ot_train.py:351 step:48K smpl:382K ep:1K epch:27.42 loss:0.038 grdn:4.402 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:04:23 ot_train.py:351 step:48K smpl:384K ep:1K epch:27.53 loss:0.038 grdn:4.503 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:04:58 ot_train.py:351 step:48K smpl:386K ep:1K epch:27.65 loss:0.038 grdn:4.354 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:05:33 ot_train.py:351 step:48K smpl:387K ep:1K epch:27.76 loss:0.038 grdn:4.571 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:06:08 ot_train.py:351 step:49K smpl:389K ep:1K epch:27.88 loss:0.039 grdn:4.511 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:06:43 ot_train.py:351 step:49K smpl:390K ep:1K epch:27.99 loss:0.037 grdn:4.480 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:07:18 ot_train.py:351 step:49K smpl:392K ep:1K epch:28.11 loss:0.037 grdn:4.562 lr:1.0e-05 updt_s:0.165 data_s:0.013
+INFO 2026-03-12 14:07:53 ot_train.py:351 step:49K smpl:394K ep:1K epch:28.22 loss:0.038 grdn:4.714 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:08:28 ot_train.py:351 step:49K smpl:395K ep:1K epch:28.34 loss:0.037 grdn:4.359 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:09:04 ot_train.py:351 step:50K smpl:397K ep:1K epch:28.45 loss:0.038 grdn:4.344 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:09:39 ot_train.py:351 step:50K smpl:398K ep:1K epch:28.57 loss:0.037 grdn:4.323 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:10:14 ot_train.py:351 step:50K smpl:400K ep:1K epch:28.68 loss:0.037 grdn:4.267 lr:1.0e-05 updt_s:0.165 data_s:0.010
+INFO 2026-03-12 14:10:14 ot_train.py:361 Checkpoint policy after step 50000
+INFO 2026-03-12 14:10:15 ot_train.py:430 End of training
+
+Processing Files (0 / 0)      : |          |  0.00B /  0.00B            
+
+New Data Upload               : |          |  0.00B /  0.00B            [A
+
+
+  ...tor-act/model.safetensors:   0%|          |  563kB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:   0%|          |  563kB /  207MB            [A[A
+Processing Files (0 / 1)      :   0%|          |  563kB /  207MB,  402kB/s  
+
+New Data Upload               :   0%|          |  563kB /  134MB,  402kB/s  [A
+
+
+  ...tor-act/model.safetensors:   0%|          |  563kB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:   0%|          |  563kB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:   1%|          | 1.13MB /  207MB            [A[A
+Processing Files (0 / 1)      :   1%|          | 1.13MB /  207MB,  563kB/s  
+
+New Data Upload               :   1%|          | 1.13MB /  207MB,  563kB/s  [A
+
+
+  ...tor-act/model.safetensors:   1%|          | 2.25MB /  207MB            [A[A
+Processing Files (0 / 1)      :   1%|          | 2.25MB /  207MB, 1.02MB/s  
+
+New Data Upload               :   1%|          | 2.25MB /  207MB, 1.02MB/s  [A
+
+
+  ...tor-act/model.safetensors:   2%|▏         | 3.37MB /  207MB            [A[A
+Processing Files (0 / 1)      :   2%|▏         | 3.37MB /  207MB, 1.40MB/s  
+
+New Data Upload               :   2%|▏         | 3.37MB /  207MB, 1.40MB/s  [A
+
+
+  ...tor-act/model.safetensors:   2%|▏         | 3.37MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:   2%|▏         | 5.05MB /  207MB            [A[A
+Processing Files (0 / 1)      :   2%|▏         | 5.05MB /  207MB, 1.80MB/s  
+
+New Data Upload               :   2%|▏         | 5.05MB /  207MB, 1.80MB/s  [A
+
+
+  ...tor-act/model.safetensors:   3%|▎         | 6.73MB /  207MB            [A[A
+Processing Files (0 / 1)      :   3%|▎         | 6.73MB /  207MB, 2.24MB/s  
+
+New Data Upload               :   3%|▎         | 6.73MB /  207MB, 2.24MB/s  [A
+
+
+  ...tor-act/model.safetensors:   4%|▍         | 8.41MB /  207MB            [A[A
+Processing Files (0 / 1)      :   4%|▍         | 8.41MB /  207MB, 2.63MB/s  
+
+New Data Upload               :   4%|▍         | 8.41MB /  207MB, 2.63MB/s  [A
+
+
+  ...tor-act/model.safetensors:   5%|▍         | 9.53MB /  207MB            [A[A
+Processing Files (0 / 1)      :   5%|▍         | 9.53MB /  207MB, 2.80MB/s  
+
+New Data Upload               :   5%|▍         | 9.53MB /  207MB, 2.80MB/s  [A
+
+
+  ...tor-act/model.safetensors:   6%|▌         | 11.8MB /  207MB            [A[A
+Processing Files (0 / 1)      :   6%|▌         | 11.8MB /  207MB, 3.27MB/s  
+
+New Data Upload               :   6%|▌         | 11.8MB /  207MB, 3.27MB/s  [A
+
+
+  ...tor-act/model.safetensors:   6%|▌         | 12.9MB /  207MB            [A[A
+Processing Files (0 / 1)      :   6%|▌         | 12.9MB /  207MB, 3.39MB/s  
+
+New Data Upload               :   6%|▌         | 12.9MB /  207MB, 3.39MB/s  [A
+
+
+  ...tor-act/model.safetensors:   7%|▋         | 15.1MB /  207MB            [A[A
+Processing Files (0 / 1)      :   7%|▋         | 15.1MB /  207MB, 3.78MB/s  
+
+New Data Upload               :   7%|▋         | 15.1MB /  207MB, 3.78MB/s  [A
+
+
+  ...tor-act/model.safetensors:   7%|▋         | 15.1MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:   8%|▊         | 16.8MB /  207MB            [A[A
+Processing Files (0 / 1)      :   8%|▊         | 16.8MB /  207MB, 3.82MB/s  
+
+New Data Upload               :   8%|▊         | 16.8MB /  207MB, 3.82MB/s  [A
+
+
+  ...tor-act/model.safetensors:   8%|▊         | 17.4MB /  207MB            [A[A
+Processing Files (0 / 1)      :   8%|▊         | 17.4MB /  207MB, 3.78MB/s  
+
+New Data Upload               :   8%|▊         | 17.4MB /  207MB, 3.78MB/s  [A
+
+
+  ...tor-act/model.safetensors:   9%|▉         | 18.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :   9%|▉         | 18.5MB /  207MB, 3.85MB/s  
+
+New Data Upload               :   9%|▉         | 18.5MB /  207MB, 3.85MB/s  [A
+
+
+  ...tor-act/model.safetensors:  10%|▉         | 20.2MB /  207MB            [A[A
+Processing Files (0 / 1)      :  10%|▉         | 20.2MB /  207MB, 4.03MB/s  
+
+New Data Upload               :  10%|▉         | 20.2MB /  207MB, 4.03MB/s  [A
+
+
+  ...tor-act/model.safetensors:  10%|█         | 21.3MB /  207MB            [A[A
+Processing Files (0 / 1)      :  10%|█         | 21.3MB /  207MB, 4.09MB/s  
+
+New Data Upload               :  10%|█         | 21.3MB /  207MB, 4.09MB/s  [A
+
+
+  ...tor-act/model.safetensors:  11%|█         | 22.4MB /  207MB            [A[A
+Processing Files (0 / 1)      :  11%|█         | 22.4MB /  207MB, 4.15MB/s  
+
+New Data Upload               :  11%|█         | 22.4MB /  207MB, 4.15MB/s  [A
+
+
+  ...tor-act/model.safetensors:  11%|█         | 22.4MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  11%|█         | 23.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  11%|█         | 23.0MB /  207MB, 3.96MB/s  
+
+New Data Upload               :  11%|█         | 23.0MB /  207MB, 3.96MB/s  [A
+
+
+  ...tor-act/model.safetensors:  11%|█         | 23.0MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  12%|█▏        | 24.6MB /  207MB            [A[A
+Processing Files (0 / 1)      :  12%|█▏        | 24.6MB /  207MB, 3.97MB/s  
+
+New Data Upload               :  12%|█▏        | 24.6MB /  207MB, 3.97MB/s  [A
+
+
+  ...tor-act/model.safetensors:  12%|█▏        | 25.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  12%|█▏        | 25.0MB /  207MB, 3.91MB/s  
+
+New Data Upload               :  12%|█▏        | 25.0MB /  207MB, 3.91MB/s  [A
+
+
+  ...tor-act/model.safetensors:  12%|█▏        | 25.0MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  12%|█▏        | 25.0MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  13%|█▎        | 26.7MB /  207MB            [A[A
+Processing Files (0 / 1)      :  13%|█▎        | 26.7MB /  207MB, 3.81MB/s  
+
+New Data Upload               :  13%|█▎        | 26.7MB /  207MB, 3.81MB/s  [A
+
+
+  ...tor-act/model.safetensors:  13%|█▎        | 26.7MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  13%|█▎        | 26.7MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  13%|█▎        | 27.8MB /  207MB            [A[A
+Processing Files (0 / 1)      :  13%|█▎        | 27.8MB /  207MB, 3.66MB/s  
+
+New Data Upload               :  13%|█▎        | 27.8MB /  207MB, 3.66MB/s  [A
+
+
+  ...tor-act/model.safetensors:  14%|█▍        | 28.9MB /  207MB            [A[A
+Processing Files (0 / 1)      :  14%|█▍        | 28.9MB /  207MB, 3.71MB/s  
+
+New Data Upload               :  14%|█▍        | 28.9MB /  207MB, 3.71MB/s  [A
+
+
+  ...tor-act/model.safetensors:  14%|█▍        | 28.9MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  14%|█▍        | 29.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  14%|█▍        | 29.5MB /  207MB, 3.60MB/s  
+
+New Data Upload               :  14%|█▍        | 29.5MB /  207MB, 3.60MB/s  [A
+
+
+  ...tor-act/model.safetensors:  14%|█▍        | 29.5MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  15%|█▍        | 30.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  15%|█▍        | 30.0MB /  207MB, 3.49MB/s  
+
+New Data Upload               :  15%|█▍        | 30.0MB /  207MB, 3.49MB/s  [A
+
+
+  ...tor-act/model.safetensors:  15%|█▍        | 30.6MB /  207MB            [A[A
+Processing Files (0 / 1)      :  15%|█▍        | 30.6MB /  207MB, 3.48MB/s  
+
+New Data Upload               :  15%|█▍        | 30.6MB /  207MB, 3.48MB/s  [A
+
+
+  ...tor-act/model.safetensors:  15%|█▍        | 30.6MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  15%|█▌        | 31.7MB /  207MB            [A[A
+Processing Files (0 / 1)      :  15%|█▌        | 31.7MB /  207MB, 3.45MB/s  
+
+New Data Upload               :  15%|█▌        | 31.7MB /  207MB, 3.45MB/s  [A
+
+
+  ...tor-act/model.safetensors:  15%|█▌        | 31.7MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  15%|█▌        | 31.7MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  16%|█▌        | 32.8MB /  207MB            [A[A
+Processing Files (0 / 1)      :  16%|█▌        | 32.8MB /  207MB, 3.35MB/s  
+
+New Data Upload               :  16%|█▌        | 32.8MB /  207MB, 3.35MB/s  [A
+
+
+  ...tor-act/model.safetensors:  16%|█▌        | 32.8MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  16%|█▋        | 34.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  16%|█▋        | 34.0MB /  207MB, 3.33MB/s  
+
+New Data Upload               :  16%|█▋        | 34.0MB /  207MB, 3.33MB/s  [A
+
+
+  ...tor-act/model.safetensors:  17%|█▋        | 34.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  17%|█▋        | 34.5MB /  207MB, 3.38MB/s  
+
+New Data Upload               :  17%|█▋        | 34.5MB /  207MB, 3.38MB/s  [A
+
+
+  ...tor-act/model.safetensors:  17%|█▋        | 34.5MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  17%|█▋        | 34.5MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  17%|█▋        | 34.5MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  17%|█▋        | 35.1MB /  207MB            [A[A
+Processing Files (0 / 1)      :  17%|█▋        | 35.1MB /  207MB, 3.44MB/s  
+
+New Data Upload               :  17%|█▋        | 35.1MB /  207MB, 3.44MB/s  [A
+
+
+  ...tor-act/model.safetensors:  18%|█▊        | 36.2MB /  207MB            [A[A
+Processing Files (0 / 1)      :  18%|█▊        | 36.2MB /  207MB, 3.55MB/s  
+
+New Data Upload               :  18%|█▊        | 36.2MB /  207MB, 3.55MB/s  [A
+
+
+  ...tor-act/model.safetensors:  18%|█▊        | 37.3MB /  207MB            [A[A
+Processing Files (0 / 1)      :  18%|█▊        | 37.3MB /  207MB, 3.60MB/s  
+
+New Data Upload               :  18%|█▊        | 37.3MB /  207MB, 3.60MB/s  [A
+
+
+  ...tor-act/model.safetensors:  18%|█▊        | 37.3MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  19%|█▊        | 38.4MB /  207MB            [A[A
+Processing Files (0 / 1)      :  19%|█▊        | 38.4MB /  207MB, 3.71MB/s  
+
+New Data Upload               :  19%|█▊        | 38.4MB /  207MB, 3.71MB/s  [A
+
+
+  ...tor-act/model.safetensors:  19%|█▊        | 38.4MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  19%|█▉        | 39.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  19%|█▉        | 39.0MB /  207MB, 3.60MB/s  
+
+New Data Upload               :  19%|█▉        | 39.0MB /  207MB, 3.60MB/s  [A
+
+
+  ...tor-act/model.safetensors:  19%|█▉        | 39.0MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  19%|█▉        | 39.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  19%|█▉        | 39.5MB /  207MB, 3.55MB/s  
+
+New Data Upload               :  19%|█▉        | 39.5MB /  207MB, 3.55MB/s  [A
+
+
+  ...tor-act/model.safetensors:  19%|█▉        | 39.5MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  20%|█▉        | 40.7MB /  207MB            [A[A
+Processing Files (0 / 1)      :  20%|█▉        | 40.7MB /  207MB, 3.33MB/s  
+
+New Data Upload               :  20%|█▉        | 40.7MB /  207MB, 3.33MB/s  [A
+
+
+  ...tor-act/model.safetensors:  20%|██        | 41.8MB /  207MB            [A[A
+Processing Files (0 / 1)      :  20%|██        | 41.8MB /  207MB, 3.27MB/s  
+
+New Data Upload               :  20%|██        | 41.8MB /  207MB, 3.27MB/s  [A
+
+
+  ...tor-act/model.safetensors:  20%|██        | 41.8MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  20%|██        | 41.8MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  20%|██        | 42.4MB /  207MB            [A[A
+Processing Files (0 / 1)      :  20%|██        | 42.4MB /  207MB, 2.89MB/s  
+
+New Data Upload               :  20%|██        | 42.4MB /  207MB, 2.89MB/s  [A
+
+
+  ...tor-act/model.safetensors:  21%|██        | 43.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  21%|██        | 43.5MB /  207MB, 2.78MB/s  
+
+New Data Upload               :  21%|██        | 43.5MB /  207MB, 2.78MB/s  [A
+
+
+  ...tor-act/model.safetensors:  21%|██▏       | 44.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  21%|██▏       | 44.0MB /  207MB, 2.83MB/s  
+
+New Data Upload               :  21%|██▏       | 44.0MB /  207MB, 2.83MB/s  [A
+
+
+  ...tor-act/model.safetensors:  21%|██▏       | 44.0MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  22%|██▏       | 45.2MB /  207MB            [A[A
+Processing Files (0 / 1)      :  22%|██▏       | 45.2MB /  207MB, 2.72MB/s  
+
+New Data Upload               :  22%|██▏       | 45.2MB /  207MB, 2.72MB/s  [A
+
+
+  ...tor-act/model.safetensors:  22%|██▏       | 45.2MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  22%|██▏       | 45.7MB /  207MB            [A[A
+Processing Files (0 / 1)      :  22%|██▏       | 45.7MB /  207MB, 2.50MB/s  
+
+New Data Upload               :  22%|██▏       | 45.7MB /  207MB, 2.50MB/s  [A
+
+
+  ...tor-act/model.safetensors:  23%|██▎       | 47.4MB /  207MB            [A[A
+Processing Files (0 / 1)      :  23%|██▎       | 47.4MB /  207MB, 2.56MB/s  
+
+New Data Upload               :  23%|██▎       | 47.4MB /  207MB, 2.56MB/s  [A
+
+
+  ...tor-act/model.safetensors:  23%|██▎       | 47.4MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  23%|██▎       | 48.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  23%|██▎       | 48.5MB /  207MB, 2.56MB/s  
+
+New Data Upload               :  23%|██▎       | 48.5MB /  207MB, 2.56MB/s  [A
+
+
+  ...tor-act/model.safetensors:  23%|██▎       | 48.5MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  24%|██▎       | 49.1MB /  207MB            [A[A
+Processing Files (0 / 1)      :  24%|██▎       | 49.1MB /  207MB, 2.56MB/s  
+
+New Data Upload               :  24%|██▎       | 49.1MB /  207MB, 2.56MB/s  [A
+
+
+  ...tor-act/model.safetensors:  24%|██▍       | 49.6MB /  207MB            [A[A
+Processing Files (0 / 1)      :  24%|██▍       | 49.6MB /  207MB, 2.45MB/s  
+
+New Data Upload               :  24%|██▍       | 49.6MB /  207MB, 2.45MB/s  [A
+
+
+  ...tor-act/model.safetensors:  25%|██▌       | 51.9MB /  207MB            [A[A
+Processing Files (0 / 1)      :  25%|██▌       | 51.9MB /  207MB, 2.63MB/s  
+
+New Data Upload               :  25%|██▌       | 51.9MB /  207MB, 2.63MB/s  [A
+
+
+  ...tor-act/model.safetensors:  25%|██▌       | 51.9MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  25%|██▌       | 52.4MB /  207MB            [A[A
+Processing Files (0 / 1)      :  25%|██▌       | 52.4MB /  207MB, 2.69MB/s  
+
+New Data Upload               :  25%|██▌       | 52.4MB /  207MB, 2.69MB/s  [A
+
+
+  ...tor-act/model.safetensors:  26%|██▌       | 53.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  26%|██▌       | 53.5MB /  207MB, 2.63MB/s  
+
+New Data Upload               :  26%|██▌       | 53.5MB /  207MB, 2.63MB/s  [A
+
+
+  ...tor-act/model.safetensors:  26%|██▋       | 54.7MB /  207MB            [A[A
+Processing Files (0 / 1)      :  26%|██▋       | 54.7MB /  207MB, 2.74MB/s  
+
+New Data Upload               :  26%|██▋       | 54.7MB /  207MB, 2.74MB/s  [A
+
+
+  ...tor-act/model.safetensors:  28%|██▊       | 56.9MB /  207MB            [A[A
+Processing Files (0 / 1)      :  28%|██▊       | 56.9MB /  207MB, 2.96MB/s  
+
+New Data Upload               :  28%|██▊       | 56.9MB /  207MB, 2.96MB/s  [A
+
+
+  ...tor-act/model.safetensors:  28%|██▊       | 58.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  28%|██▊       | 58.0MB /  207MB, 2.96MB/s  
+
+New Data Upload               :  28%|██▊       | 58.0MB /  207MB, 2.96MB/s  [A
+
+
+  ...tor-act/model.safetensors:  29%|██▊       | 59.2MB /  207MB            [A[A
+Processing Files (0 / 1)      :  29%|██▊       | 59.2MB /  207MB, 2.96MB/s  
+
+New Data Upload               :  29%|██▊       | 59.2MB /  207MB, 2.96MB/s  [A
+
+
+  ...tor-act/model.safetensors:  29%|██▉       | 60.8MB /  207MB            [A[A
+Processing Files (0 / 1)      :  29%|██▉       | 60.8MB /  207MB, 3.13MB/s  
+
+New Data Upload               :  29%|██▉       | 60.8MB /  207MB, 3.13MB/s  [A
+
+
+  ...tor-act/model.safetensors:  29%|██▉       | 60.8MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  30%|███       | 62.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  30%|███       | 62.5MB /  207MB, 3.24MB/s  
+
+New Data Upload               :  30%|███       | 62.5MB /  207MB, 3.24MB/s  [A
+
+
+  ...tor-act/model.safetensors:  31%|███       | 63.1MB /  207MB            [A[A
+Processing Files (0 / 1)      :  31%|███       | 63.1MB /  207MB, 3.24MB/s  
+
+New Data Upload               :  31%|███       | 63.1MB /  207MB, 3.24MB/s  [A
+
+
+  ...tor-act/model.safetensors:  31%|███▏      | 64.8MB /  207MB            [A[A
+Processing Files (0 / 1)      :  31%|███▏      | 64.8MB /  207MB, 3.35MB/s  
+
+New Data Upload               :  31%|███▏      | 64.8MB /  207MB, 3.35MB/s  [A
+
+
+  ...tor-act/model.safetensors:  32%|███▏      | 65.9MB /  207MB            [A[A
+Processing Files (0 / 1)      :  32%|███▏      | 65.9MB /  207MB, 3.46MB/s  
+
+New Data Upload               :  32%|███▏      | 65.9MB /  207MB, 3.46MB/s  [A
+
+
+  ...tor-act/model.safetensors:  33%|███▎      | 68.7MB /  207MB            [A[A
+Processing Files (0 / 1)      :  33%|███▎      | 68.7MB /  207MB, 3.62MB/s  
+
+New Data Upload               :  33%|███▎      | 68.7MB /  207MB, 3.62MB/s  [A
+
+
+  ...tor-act/model.safetensors:  34%|███▍      | 70.4MB /  207MB            [A[A
+Processing Files (0 / 1)      :  34%|███▍      | 70.4MB /  207MB, 3.79MB/s  
+
+New Data Upload               :  34%|███▍      | 70.4MB /  207MB, 3.79MB/s  [A
+
+
+  ...tor-act/model.safetensors:  34%|███▍      | 70.4MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  35%|███▌      | 73.2MB /  207MB            [A[A
+Processing Files (0 / 1)      :  35%|███▌      | 73.2MB /  207MB, 3.95MB/s  
+
+New Data Upload               :  35%|███▌      | 73.2MB /  207MB, 3.95MB/s  [A
+
+
+  ...tor-act/model.safetensors:  35%|███▌      | 73.2MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  37%|███▋      | 76.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  37%|███▋      | 76.0MB /  207MB, 4.12MB/s  
+
+New Data Upload               :  37%|███▋      | 76.0MB /  207MB, 4.12MB/s  [A
+
+
+  ...tor-act/model.safetensors:  37%|███▋      | 76.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  37%|███▋      | 76.5MB /  207MB, 4.12MB/s  
+
+New Data Upload               :  37%|███▋      | 76.5MB /  207MB, 4.12MB/s  [A
+
+
+  ...tor-act/model.safetensors:  38%|███▊      | 78.2MB /  207MB            [A[A
+Processing Files (0 / 1)      :  38%|███▊      | 78.2MB /  207MB, 4.28MB/s  
+
+New Data Upload               :  38%|███▊      | 78.2MB /  207MB, 4.28MB/s  [A
+
+
+  ...tor-act/model.safetensors:  38%|███▊      | 79.3MB /  207MB            [A[A
+Processing Files (0 / 1)      :  38%|███▊      | 79.3MB /  207MB, 4.39MB/s  
+
+New Data Upload               :  38%|███▊      | 79.3MB /  207MB, 4.39MB/s  [A
+
+
+  ...tor-act/model.safetensors:  39%|███▉      | 81.0MB /  207MB            [A[A
+Processing Files (0 / 1)      :  39%|███▉      | 81.0MB /  207MB, 4.56MB/s  
+
+New Data Upload               :  39%|███▉      | 81.0MB /  207MB, 4.56MB/s  [A
+
+
+  ...tor-act/model.safetensors:  41%|████      | 83.8MB /  207MB            [A[A
+Processing Files (0 / 1)      :  41%|████      | 83.8MB /  207MB, 4.78MB/s  
+
+New Data Upload               :  41%|████      | 83.8MB /  207MB, 4.78MB/s  [A
+
+
+  ...tor-act/model.safetensors:  41%|████      | 83.8MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  41%|████▏     | 85.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  41%|████▏     | 85.5MB /  207MB, 4.73MB/s  
+
+New Data Upload               :  41%|████▏     | 85.5MB /  207MB, 4.73MB/s  [A
+
+
+  ...tor-act/model.safetensors:  42%|████▏     | 87.2MB /  207MB            [A[A
+Processing Files (0 / 1)      :  42%|████▏     | 87.2MB /  207MB, 4.89MB/s  
+
+New Data Upload               :  42%|████▏     | 87.2MB /  207MB, 4.89MB/s  [A
+
+
+  ...tor-act/model.safetensors:  43%|████▎     | 88.9MB /  207MB            [A[A
+Processing Files (0 / 1)      :  43%|████▎     | 88.9MB /  207MB, 4.95MB/s  
+
+New Data Upload               :  43%|████▎     | 88.9MB /  207MB, 4.95MB/s  [A
+
+
+  ...tor-act/model.safetensors:  44%|████▍     | 90.6MB /  207MB            [A[A
+Processing Files (0 / 1)      :  44%|████▍     | 90.6MB /  207MB, 5.11MB/s  
+
+New Data Upload               :  44%|████▍     | 90.6MB /  207MB, 5.11MB/s  [A
+
+
+  ...tor-act/model.safetensors:  44%|████▍     | 91.7MB /  207MB            [A[A
+Processing Files (0 / 1)      :  44%|████▍     | 91.7MB /  207MB, 5.16MB/s  
+
+New Data Upload               :  44%|████▍     | 91.7MB /  207MB, 5.16MB/s  [A
+
+
+  ...tor-act/model.safetensors:  45%|████▌     | 93.4MB /  207MB            [A[A
+Processing Files (0 / 1)      :  45%|████▌     | 93.4MB /  207MB, 5.33MB/s  
+
+New Data Upload               :  45%|████▌     | 93.4MB /  207MB, 5.33MB/s  [A
+
+
+  ...tor-act/model.safetensors:  46%|████▌     | 94.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  46%|████▌     | 94.5MB /  207MB, 5.38MB/s  
+
+New Data Upload               :  46%|████▌     | 94.5MB /  207MB, 5.38MB/s  [A
+
+
+  ...tor-act/model.safetensors:  47%|████▋     | 97.3MB /  207MB            [A[A
+Processing Files (0 / 1)      :  47%|████▋     | 97.3MB /  207MB, 5.66MB/s  
+
+New Data Upload               :  47%|████▋     | 97.3MB /  207MB, 5.66MB/s  [A
+
+
+  ...tor-act/model.safetensors:  48%|████▊     | 99.5MB /  207MB            [A[A
+Processing Files (0 / 1)      :  48%|████▊     | 99.5MB /  207MB, 5.77MB/s  
+
+New Data Upload               :  48%|████▊     | 99.5MB /  207MB, 5.77MB/s  [A
+
+
+  ...tor-act/model.safetensors:  48%|████▊     | 99.5MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  50%|████▉     |  102MB /  207MB            [A[A
+Processing Files (0 / 1)      :  50%|████▉     |  102MB /  207MB, 5.93MB/s  
+
+New Data Upload               :  50%|████▉     |  102MB /  207MB, 5.93MB/s  [A
+
+
+  ...tor-act/model.safetensors:  50%|█████     |  104MB /  207MB            [A[A
+Processing Files (0 / 1)      :  50%|█████     |  104MB /  207MB, 6.10MB/s  
+
+New Data Upload               :  50%|█████     |  104MB /  207MB, 6.10MB/s  [A
+
+
+  ...tor-act/model.safetensors:  50%|█████     |  104MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  52%|█████▏    |  107MB /  207MB            [A[A
+Processing Files (0 / 1)      :  52%|█████▏    |  107MB /  207MB, 6.27MB/s  
+
+New Data Upload               :  52%|█████▏    |  107MB /  207MB, 6.27MB/s  [A
+
+
+  ...tor-act/model.safetensors:  52%|█████▏    |  107MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  53%|█████▎    |  110MB /  207MB            [A[A
+Processing Files (0 / 1)      :  53%|█████▎    |  110MB /  207MB, 6.49MB/s  
+
+New Data Upload               :  53%|█████▎    |  110MB /  207MB, 6.49MB/s  [A
+
+
+  ...tor-act/model.safetensors:  54%|█████▍    |  112MB /  207MB            [A[A
+Processing Files (0 / 1)      :  54%|█████▍    |  112MB /  207MB, 6.54MB/s  
+
+New Data Upload               :  54%|█████▍    |  112MB /  207MB, 6.54MB/s  [A
+
+
+  ...tor-act/model.safetensors:  55%|█████▍    |  113MB /  207MB            [A[A
+Processing Files (0 / 1)      :  55%|█████▍    |  113MB /  207MB, 6.65MB/s  
+
+New Data Upload               :  55%|█████▍    |  113MB /  207MB, 6.65MB/s  [A
+
+
+  ...tor-act/model.safetensors:  55%|█████▌    |  115MB /  207MB            [A[A
+Processing Files (0 / 1)      :  55%|█████▌    |  115MB /  207MB, 6.76MB/s  
+
+New Data Upload               :  55%|█████▌    |  115MB /  207MB, 6.76MB/s  [A
+
+
+  ...tor-act/model.safetensors:  57%|█████▋    |  118MB /  207MB            [A[A
+Processing Files (0 / 1)      :  57%|█████▋    |  118MB /  207MB, 6.92MB/s  
+
+New Data Upload               :  57%|█████▋    |  118MB /  207MB, 6.92MB/s  [A
+
+
+  ...tor-act/model.safetensors:  57%|█████▋    |  118MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  58%|█████▊    |  120MB /  207MB            [A[A
+Processing Files (0 / 1)      :  58%|█████▊    |  120MB /  207MB, 7.03MB/s  
+
+New Data Upload               :  58%|█████▊    |  120MB /  207MB, 7.03MB/s  [A
+
+
+  ...tor-act/model.safetensors:  60%|█████▉    |  123MB /  207MB            [A[A
+Processing Files (0 / 1)      :  60%|█████▉    |  123MB /  207MB, 7.31MB/s  
+
+New Data Upload               :  60%|█████▉    |  123MB /  207MB, 7.31MB/s  [A
+
+
+  ...tor-act/model.safetensors:  61%|██████    |  125MB /  207MB            [A[A
+Processing Files (0 / 1)      :  61%|██████    |  125MB /  207MB, 7.47MB/s  
+
+New Data Upload               :  61%|██████    |  125MB /  207MB, 7.47MB/s  [A
+
+
+  ...tor-act/model.safetensors:  61%|██████    |  125MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  62%|██████▏   |  129MB /  207MB            [A[A
+Processing Files (0 / 1)      :  62%|██████▏   |  129MB /  207MB, 7.53MB/s  
+
+New Data Upload               :  62%|██████▏   |  129MB /  207MB, 7.53MB/s  [A
+
+
+  ...tor-act/model.safetensors:  63%|██████▎   |  130MB /  207MB            [A[A
+Processing Files (0 / 1)      :  63%|██████▎   |  130MB /  207MB, 7.64MB/s  
+
+New Data Upload               :  63%|██████▎   |  130MB /  207MB, 7.64MB/s  [A
+
+
+  ...tor-act/model.safetensors:  63%|██████▎   |  131MB /  207MB            [A[A
+Processing Files (0 / 1)      :  63%|██████▎   |  131MB /  207MB, 7.69MB/s  
+
+New Data Upload               :  63%|██████▎   |  131MB /  207MB, 7.69MB/s  [A
+
+
+  ...tor-act/model.safetensors:  65%|██████▍   |  134MB /  207MB            [A[A
+Processing Files (0 / 1)      :  65%|██████▍   |  134MB /  207MB, 7.86MB/s  
+
+New Data Upload               :  65%|██████▍   |  134MB /  207MB, 7.86MB/s  [A
+
+
+  ...tor-act/model.safetensors:  65%|██████▌   |  135MB /  207MB            [A[A
+Processing Files (0 / 1)      :  65%|██████▌   |  135MB /  207MB, 7.86MB/s  
+
+New Data Upload               :  65%|██████▌   |  135MB /  207MB, 7.86MB/s  [A
+
+
+  ...tor-act/model.safetensors:  66%|██████▌   |  136MB /  207MB            [A[A
+Processing Files (0 / 1)      :  66%|██████▌   |  136MB /  207MB, 7.75MB/s  
+
+New Data Upload               :  66%|██████▌   |  136MB /  207MB, 7.75MB/s  [A
+
+
+  ...tor-act/model.safetensors:  66%|██████▌   |  136MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  66%|██████▋   |  137MB /  207MB            [A[A
+Processing Files (0 / 1)      :  66%|██████▋   |  137MB /  207MB, 7.64MB/s  
+
+New Data Upload               :  66%|██████▋   |  137MB /  207MB, 7.64MB/s  [A
+
+
+  ...tor-act/model.safetensors:  67%|██████▋   |  138MB /  207MB            [A[A
+Processing Files (0 / 1)      :  67%|██████▋   |  138MB /  207MB, 7.58MB/s  
+
+New Data Upload               :  67%|██████▋   |  138MB /  207MB, 7.58MB/s  [A
+
+
+  ...tor-act/model.safetensors:  67%|██████▋   |  139MB /  207MB            [A[A
+Processing Files (0 / 1)      :  67%|██████▋   |  139MB /  207MB, 7.64MB/s  
+
+New Data Upload               :  67%|██████▋   |  139MB /  207MB, 7.64MB/s  [A
+
+
+  ...tor-act/model.safetensors:  67%|██████▋   |  139MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  68%|██████▊   |  141MB /  207MB            [A[A
+Processing Files (0 / 1)      :  68%|██████▊   |  141MB /  207MB, 7.64MB/s  
+
+New Data Upload               :  68%|██████▊   |  141MB /  207MB, 7.64MB/s  [A
+
+
+  ...tor-act/model.safetensors:  68%|██████▊   |  141MB /  207MB            [A[A
+Processing Files (0 / 1)      :  68%|██████▊   |  141MB /  207MB, 7.48MB/s  
+
+New Data Upload               :  68%|██████▊   |  141MB /  207MB, 7.48MB/s  [A
+
+
+  ...tor-act/model.safetensors:  69%|██████▊   |  142MB /  207MB            [A[A
+Processing Files (0 / 1)      :  69%|██████▊   |  142MB /  207MB, 7.43MB/s  
+
+New Data Upload               :  69%|██████▊   |  142MB /  207MB, 7.43MB/s  [A
+
+
+  ...tor-act/model.safetensors:  69%|██████▉   |  142MB /  207MB            [A[A
+Processing Files (0 / 1)      :  69%|██████▉   |  142MB /  207MB, 7.21MB/s  
+
+New Data Upload               :  69%|██████▉   |  142MB /  207MB, 7.21MB/s  [A
+
+
+  ...tor-act/model.safetensors:  69%|██████▉   |  143MB /  207MB            [A[A
+Processing Files (0 / 1)      :  69%|██████▉   |  143MB /  207MB, 7.15MB/s  
+
+New Data Upload               :  69%|██████▉   |  143MB /  207MB, 7.15MB/s  [A
+
+
+  ...tor-act/model.safetensors:  70%|██████▉   |  144MB /  207MB            [A[A
+Processing Files (0 / 1)      :  70%|██████▉   |  144MB /  207MB, 7.26MB/s  
+
+New Data Upload               :  70%|██████▉   |  144MB /  207MB, 7.26MB/s  [A
+
+
+  ...tor-act/model.safetensors:  70%|███████   |  146MB /  207MB            [A[A
+Processing Files (0 / 1)      :  70%|███████   |  146MB /  207MB, 7.09MB/s  
+
+New Data Upload               :  70%|███████   |  146MB /  207MB, 7.09MB/s  [A
+
+
+  ...tor-act/model.safetensors:  71%|███████   |  147MB /  207MB            [A[A
+Processing Files (0 / 1)      :  71%|███████   |  147MB /  207MB, 7.20MB/s  
+
+New Data Upload               :  71%|███████   |  147MB /  207MB, 7.20MB/s  [A
+
+
+  ...tor-act/model.safetensors:  71%|███████   |  147MB /  207MB            [A[A
+Processing Files (0 / 1)      :  71%|███████   |  147MB /  207MB, 6.98MB/s  
+
+New Data Upload               :  71%|███████   |  147MB /  207MB, 6.98MB/s  [A
+
+
+  ...tor-act/model.safetensors:  71%|███████   |  147MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  72%|███████▏  |  149MB /  207MB            [A[A
+Processing Files (0 / 1)      :  72%|███████▏  |  149MB /  207MB, 6.93MB/s  
+
+New Data Upload               :  72%|███████▏  |  149MB /  207MB, 6.93MB/s  [A
+
+
+  ...tor-act/model.safetensors:  72%|███████▏  |  149MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  73%|███████▎  |  151MB /  207MB            [A[A
+Processing Files (0 / 1)      :  73%|███████▎  |  151MB /  207MB, 6.87MB/s  
+
+New Data Upload               :  73%|███████▎  |  151MB /  207MB, 6.87MB/s  [A
+
+
+  ...tor-act/model.safetensors:  74%|███████▎  |  152MB /  207MB            [A[A
+Processing Files (0 / 1)      :  74%|███████▎  |  152MB /  207MB, 6.71MB/s  
+
+New Data Upload               :  74%|███████▎  |  152MB /  207MB, 6.71MB/s  [A
+
+
+  ...tor-act/model.safetensors:  74%|███████▍  |  153MB /  207MB            [A[A
+Processing Files (0 / 1)      :  74%|███████▍  |  153MB /  207MB, 6.76MB/s  
+
+New Data Upload               :  74%|███████▍  |  153MB /  207MB, 6.76MB/s  [A
+
+
+  ...tor-act/model.safetensors:  74%|███████▍  |  154MB /  207MB            [A[A
+Processing Files (0 / 1)      :  74%|███████▍  |  154MB /  207MB, 6.71MB/s  
+
+New Data Upload               :  74%|███████▍  |  154MB /  207MB, 6.71MB/s  [A
+
+
+  ...tor-act/model.safetensors:  75%|███████▍  |  155MB /  207MB            [A[A
+Processing Files (0 / 1)      :  75%|███████▍  |  155MB /  207MB, 6.65MB/s  
+
+New Data Upload               :  75%|███████▍  |  155MB /  207MB, 6.65MB/s  [A
+
+
+  ...tor-act/model.safetensors:  75%|███████▌  |  156MB /  207MB            [A[A
+Processing Files (0 / 1)      :  75%|███████▌  |  156MB /  207MB, 6.54MB/s  
+
+New Data Upload               :  75%|███████▌  |  156MB /  207MB, 6.54MB/s  [A
+
+
+  ...tor-act/model.safetensors:  76%|███████▌  |  157MB /  207MB            [A[A
+Processing Files (0 / 1)      :  76%|███████▌  |  157MB /  207MB, 6.48MB/s  
+
+New Data Upload               :  76%|███████▌  |  157MB /  207MB, 6.48MB/s  [A
+
+
+  ...tor-act/model.safetensors:  77%|███████▋  |  159MB /  207MB            [A[A
+Processing Files (0 / 1)      :  77%|███████▋  |  159MB /  207MB, 6.65MB/s  
+
+New Data Upload               :  77%|███████▋  |  159MB /  207MB, 6.65MB/s  [A
+
+
+  ...tor-act/model.safetensors:  77%|███████▋  |  159MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  78%|███████▊  |  162MB /  207MB            [A[A
+Processing Files (0 / 1)      :  78%|███████▊  |  162MB /  207MB, 6.59MB/s  
+
+New Data Upload               :  78%|███████▊  |  162MB /  207MB, 6.59MB/s  [A
+
+
+  ...tor-act/model.safetensors:  79%|███████▉  |  163MB /  207MB            [A[A
+Processing Files (0 / 1)      :  79%|███████▉  |  163MB /  207MB, 6.43MB/s  
+
+New Data Upload               :  79%|███████▉  |  163MB /  207MB, 6.43MB/s  [A
+
+
+  ...tor-act/model.safetensors:  79%|███████▉  |  164MB /  207MB            [A[A
+Processing Files (0 / 1)      :  79%|███████▉  |  164MB /  207MB, 6.32MB/s  
+
+New Data Upload               :  79%|███████▉  |  164MB /  207MB, 6.32MB/s  [A
+
+
+  ...tor-act/model.safetensors:  80%|████████  |  166MB /  207MB            [A[A
+Processing Files (0 / 1)      :  80%|████████  |  166MB /  207MB, 6.48MB/s  
+
+New Data Upload               :  80%|████████  |  166MB /  207MB, 6.48MB/s  [A
+
+
+  ...tor-act/model.safetensors:  81%|████████  |  167MB /  207MB            [A[A
+Processing Files (0 / 1)      :  81%|████████  |  167MB /  207MB, 6.37MB/s  
+
+New Data Upload               :  81%|████████  |  167MB /  207MB, 6.37MB/s  [A
+
+
+  ...tor-act/model.safetensors:  82%|████████▏ |  170MB /  207MB            [A[A
+Processing Files (0 / 1)      :  82%|████████▏ |  170MB /  207MB, 6.48MB/s  
+
+New Data Upload               :  82%|████████▏ |  170MB /  207MB, 6.48MB/s  [A
+
+
+  ...tor-act/model.safetensors:  82%|████████▏ |  170MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  84%|████████▎ |  173MB /  207MB            [A[A
+Processing Files (0 / 1)      :  84%|████████▎ |  173MB /  207MB, 6.42MB/s  
+
+New Data Upload               :  84%|████████▎ |  173MB /  207MB, 6.42MB/s  [A
+
+
+  ...tor-act/model.safetensors:  84%|████████▍ |  175MB /  207MB            [A[A
+Processing Files (0 / 1)      :  84%|████████▍ |  175MB /  207MB, 6.58MB/s  
+
+New Data Upload               :  84%|████████▍ |  175MB /  207MB, 6.58MB/s  [A
+
+
+  ...tor-act/model.safetensors:  85%|████████▌ |  176MB /  207MB            [A[A
+Processing Files (0 / 1)      :  85%|████████▌ |  176MB /  207MB, 6.47MB/s  
+
+New Data Upload               :  85%|████████▌ |  176MB /  207MB, 6.47MB/s  [A
+
+
+  ...tor-act/model.safetensors:  86%|████████▌ |  177MB /  207MB            [A[A
+Processing Files (0 / 1)      :  86%|████████▌ |  177MB /  207MB, 6.42MB/s  
+
+New Data Upload               :  86%|████████▌ |  177MB /  207MB, 6.42MB/s  [A
+
+
+  ...tor-act/model.safetensors:  87%|████████▋ |  179MB /  207MB            [A[A
+Processing Files (0 / 1)      :  87%|████████▋ |  179MB /  207MB, 6.47MB/s  
+
+New Data Upload               :  87%|████████▋ |  179MB /  207MB, 6.47MB/s  [A
+
+
+  ...tor-act/model.safetensors:  87%|████████▋ |  179MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  88%|████████▊ |  182MB /  207MB            [A[A
+Processing Files (0 / 1)      :  88%|████████▊ |  182MB /  207MB, 6.31MB/s  
+
+New Data Upload               :  88%|████████▊ |  182MB /  207MB, 6.31MB/s  [A
+
+
+  ...tor-act/model.safetensors:  88%|████████▊ |  182MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  90%|████████▉ |  186MB /  207MB            [A[A
+Processing Files (0 / 1)      :  90%|████████▉ |  186MB /  207MB, 6.41MB/s  
+
+New Data Upload               :  90%|████████▉ |  186MB /  207MB, 6.41MB/s  [A
+
+
+  ...tor-act/model.safetensors:  90%|████████▉ |  186MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  91%|█████████ |  187MB /  207MB            [A[A
+Processing Files (0 / 1)      :  91%|█████████ |  187MB /  207MB, 6.08MB/s  
+
+New Data Upload               :  91%|█████████ |  187MB /  207MB, 6.08MB/s  [A
+
+
+  ...tor-act/model.safetensors:  91%|█████████▏|  189MB /  207MB            [A[A
+Processing Files (0 / 1)      :  91%|█████████▏|  189MB /  207MB, 6.25MB/s  
+
+New Data Upload               :  91%|█████████▏|  189MB /  207MB, 6.25MB/s  [A
+
+
+  ...tor-act/model.safetensors:  92%|█████████▏|  190MB /  207MB            [A[A
+Processing Files (0 / 1)      :  92%|█████████▏|  190MB /  207MB, 6.03MB/s  
+
+New Data Upload               :  92%|█████████▏|  190MB /  207MB, 6.03MB/s  [A
+
+
+  ...tor-act/model.safetensors:  93%|█████████▎|  192MB /  207MB            [A[A
+Processing Files (0 / 1)      :  93%|█████████▎|  192MB /  207MB, 6.08MB/s  
+
+New Data Upload               :  93%|█████████▎|  192MB /  207MB, 6.08MB/s  [A
+
+
+  ...tor-act/model.safetensors:  94%|█████████▎|  193MB /  207MB            [A[A
+Processing Files (0 / 1)      :  94%|█████████▎|  193MB /  207MB, 6.14MB/s  
+
+New Data Upload               :  94%|█████████▎|  193MB /  207MB, 6.14MB/s  [A
+
+
+  ...tor-act/model.safetensors:  94%|█████████▍|  195MB /  207MB            [A[A
+Processing Files (0 / 1)      :  94%|█████████▍|  195MB /  207MB, 5.97MB/s  
+
+New Data Upload               :  94%|█████████▍|  195MB /  207MB, 5.97MB/s  [A
+
+
+  ...tor-act/model.safetensors:  94%|█████████▍|  195MB /  207MB            [A[A
+Processing Files (0 / 1)      :  94%|█████████▍|  195MB /  207MB, 5.91MB/s  
+
+New Data Upload               :  94%|█████████▍|  195MB /  207MB, 5.91MB/s  [A
+
+
+  ...tor-act/model.safetensors:  95%|█████████▌|  197MB /  207MB            [A[A
+Processing Files (0 / 1)      :  95%|█████████▌|  197MB /  207MB, 5.97MB/s  
+
+New Data Upload               :  95%|█████████▌|  197MB /  207MB, 5.97MB/s  [A
+
+
+  ...tor-act/model.safetensors:  95%|█████████▌|  197MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  96%|█████████▌|  198MB /  207MB            [A[A
+Processing Files (0 / 1)      :  96%|█████████▌|  198MB /  207MB, 6.02MB/s  
+
+New Data Upload               :  96%|█████████▌|  198MB /  207MB, 6.02MB/s  [A
+
+
+  ...tor-act/model.safetensors:  96%|█████████▌|  198MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  97%|█████████▋|  200MB /  207MB            [A[A
+Processing Files (0 / 1)      :  97%|█████████▋|  200MB /  207MB, 6.02MB/s  
+
+New Data Upload               :  97%|█████████▋|  200MB /  207MB, 6.02MB/s  [A
+
+
+  ...tor-act/model.safetensors:  97%|█████████▋|  200MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors:  97%|█████████▋|  201MB /  207MB            [A[A
+Processing Files (0 / 1)      :  97%|█████████▋|  201MB /  207MB, 5.91MB/s  
+
+New Data Upload               :  97%|█████████▋|  201MB /  207MB, 5.91MB/s  [A
+
+
+  ...tor-act/model.safetensors:  97%|█████████▋|  202MB /  207MB            [A[A
+Processing Files (0 / 1)      :  97%|█████████▋|  202MB /  207MB, 5.93MB/s  
+
+New Data Upload               :  97%|█████████▋|  202MB /  207MB, 5.93MB/s  [A
+
+
+  ...tor-act/model.safetensors:  98%|█████████▊|  203MB /  207MB            [A[A
+Processing Files (0 / 1)      :  98%|█████████▊|  203MB /  207MB, 6.03MB/s  
+
+New Data Upload               :  98%|█████████▊|  203MB /  207MB, 6.03MB/s  [A
+
+
+  ...tor-act/model.safetensors:  99%|█████████▉|  205MB /  207MB            [A[A
+Processing Files (0 / 1)      :  99%|█████████▉|  205MB /  207MB, 6.14MB/s  
+
+New Data Upload               :  99%|█████████▉|  205MB /  207MB, 6.14MB/s  [A
+
+
+  ...tor-act/model.safetensors:  99%|█████████▉|  205MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  206MB /  207MB            [A[A
+Processing Files (0 / 1)      : 100%|█████████▉|  206MB /  207MB, 6.03MB/s  
+
+New Data Upload               : 100%|█████████▉|  206MB /  207MB, 6.03MB/s  [A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  206MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  207MB /  207MB            [A[A
+Processing Files (0 / 1)      : 100%|█████████▉|  207MB /  207MB, 5.87MB/s  
+
+New Data Upload               : 100%|█████████▉|  207MB /  207MB, 5.87MB/s  [A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  207MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  207MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  207MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  207MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  207MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|█████████▉|  207MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|██████████|  207MB /  207MB            [A[A
+Processing Files (1 / 1)      : 100%|██████████|  207MB /  207MB, 5.28MB/s  
+
+New Data Upload               : 100%|██████████|  207MB /  207MB, 5.28MB/s  [A
+
+
+  ...tor-act/model.safetensors: 100%|██████████|  207MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|██████████|  207MB /  207MB            [A[A
+
+
+  ...tor-act/model.safetensors: 100%|██████████|  207MB /  207MB            [A[A
+Processing Files (1 / 1)      : 100%|██████████|  207MB /  207MB, 5.11MB/s  
+
+New Data Upload               : 100%|██████████|  207MB /  207MB, 5.11MB/s  
+
+  ...tor-act/model.safetensors: 100%|██████████|  207MB /  207MB            
+INFO 2026-03-12 14:11:03 etrained.py:237 Model pushed to https://huggingface.co/RonLiao/so101-elevator-act
+
+Processing Files (0 / 0)      : |          |  0.00B /  0.00B            
+
+New Data Upload               : |          |  0.00B /  0.00B            [A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+Processing Files (1 / 1)      : 100%|██████████| 6.56kB / 6.56kB, 16.4kB/s  
+
+New Data Upload               : 100%|██████████| 6.56kB / 6.56kB, 16.4kB/s  [A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+Processing Files (1 / 1)      : 100%|██████████| 6.56kB / 6.56kB, 5.46kB/s  
+
+New Data Upload               : 100%|██████████| 6.56kB / 6.56kB, 5.46kB/s  
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            
+
+Processing Files (0 / 0)      : |          |  0.00B /  0.00B            
+
+New Data Upload               : |          |  0.00B /  0.00B            [A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+Processing Files (1 / 1)      : 100%|██████████| 6.56kB / 6.56kB,   ???B/s  
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            [A[A
+Processing Files (1 / 1)      : 100%|██████████| 6.56kB / 6.56kB,  0.00B/s  
+
+New Data Upload               : |          |  0.00B /  0.00B,  0.00B/s  
+
+  ...zer_processor.safetensors: 100%|██████████| 6.56kB / 6.56kB            

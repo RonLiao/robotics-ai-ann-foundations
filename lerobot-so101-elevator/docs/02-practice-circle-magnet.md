@@ -139,13 +139,15 @@
      --wandb.enable=true \
      --wandb.project=lerobot-so101-elevator \
      --policy.repo_id=RonLiao/so101-elevator-act \
-     2>&1 | tee -a train.log
+     2>&1 | tee -a record/so101-elevator-act.log
    ```
 
 - **首度訓練成果分析 (2026-03-12)：**
 
-   - **訓練監控 (WandB)**：[lerobot-so101-elevator](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator)
+   - **訓練資料集 (Hugging Face)**：[lerobot-so101-elevator-dataset](https://huggingface.co/datasets/RonLiao/lerobot-so101-elevator-dataset)
    - **訓練成果 (Hugging Face)**：[so101-elevator-act](https://huggingface.co/RonLiao/so101-elevator-act)
+   - **訓練監控 (WandB)**：[lerobot-so101-elevator](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator)
+   - **訓練日誌 (GitHub)**：[so101-elevator-act.log](../record/so101-elevator-act.log)
 
    這是專案第一次正式跑完 50,000 steps 的模型訓練。透過 WandB 的數據監控，獲得以下關鍵指標與心得：
 
