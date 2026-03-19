@@ -30,7 +30,7 @@
 
 3. **進入 Docker 容器**
    ```bash
-   sudo docker exec -it ron_so101_v2 /bin/bash
+   sudo docker exec -u root -it ron_so101_v2 /bin/bash
    ```
 
 4. **裝置對應與權限宣告**
@@ -43,7 +43,7 @@
 5. **啟動lerobot環境**
    ```bash
    conda activate lerobot
-   cd lerobot/src/lerobot/scripts/
+   cd /root/shared/robotics-ai-ann-foundations/lerobot-so101-elevator/
    ```
 
 6. **手臂校正（只需執行一次）**
