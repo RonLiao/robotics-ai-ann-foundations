@@ -63,7 +63,7 @@ Hugging Face 在專案中扮演了資料與權重的託管倉庫，以下是其�
 
 - 資料儲存結構 (Data Path)
   - **`data_path / video_path`**：這是描述檔案是怎麼分層存放的（例如放在 data/chunk-000）。
-  - **`Parquet 格式`**：您在 Hub 網頁上看到的表格（如第二張圖），其實是讀取 .parquet 檔案。這是一種非常適合大數據的高效能檔案格式，AI 訓練時讀取它的速度比讀取 CSV 快得多。
+  - **`Parquet 格式`**：在 Hub 網頁上看到的表格（如第二張圖），其實是讀取 .parquet 檔案。這是一種非常適合大數據的高效能檔案格式，AI 訓練時讀取它的速度比讀取 CSV 快得多。
 
 ### 3.3 如何統一 Dataset 與 Model 間的差距 (Connecting the Gap)
 

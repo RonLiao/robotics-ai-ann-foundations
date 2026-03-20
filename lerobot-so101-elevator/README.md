@@ -20,6 +20,8 @@
     - [01-setup-and-calibration.md](docs/01-setup-and-calibration.md)：環境建置、Docker 設定與手臂校正筆記。
     - [02-practice-circle-magnet.md](docs/02-practice-circle-magnet.md)：練習任務（圓形磁鐵）的錄製、訓練與推論實作紀錄。
     - [03-lerobot-framework-anatomy.md](docs/03-lerobot-framework-anatomy.md)：LeRobot 框架深度解析、資料結構與工具鏈原理。
+    - [04-practice-6-button-panel.md](docs/04-practice-6-button-panel.md)：特定電梯面板（6顆按鈕）語意語言驅動多任務模型訓練紀錄。
+    - `05-vla-elevator-pressing.md`：(規劃中) 視覺-語言-動作大模型 (VLA) 導入與實作紀錄。
 - `configs/`：放置機器人馬達校正檔 (`calibration/`) 與訓練參數配置。
 - `scripts/`：資料收集、數據驗證與監控馬達位置的工具腳本。
 - `record/`：錄製的 demonstrations 數據（.parquet 與影片）。
@@ -32,7 +34,7 @@
 
 ## 開發規劃 (Roadmap)
 
-本任務拆分為兩個階段進行：
+本任務拆分為四個階段進行：
 
 ### 階段一：練習任務 (按壓牆上圓形磁鐵)
 - **目標**：熟悉 LeRobot 完整工作流程，確保從錄製、訓練到推論的軟硬體工作正常。
@@ -48,8 +50,21 @@
   - **[已完成]** 利用 WandB 監控 Loss 曲線 (最終收斂至 2.4)。
   - **[已完成]** 將錄製的 Dataset 與訓練成果同步至 Hugging Face。
   - **[已完成]** 訓練完模型實機推論驗證測試。
-  - **[進行中]** 撰寫 [03-lerobot-framework-anatomy.md](docs/03-lerobot-framework-anatomy.md) 進行框架底層架構學習。
 
-### 階段二：正式任務 (通用電梯按壓)
-- **目標**：收集具備多樣性的真實電梯數據，訓練具備泛化能力的通用模型。
-- **作法**：上傳正式資料至 Hugging Face，調整超參數訓練大模型，並評估不同電梯面板的按壓成功率。
+### 階段二：特定面板多任務按壓 (Language-Conditioned ACT 模型)
+- **目標**：由輸入的字串決定按哪個按鈕。針對特定款式（6 顆按鈕），採用「層次二」解決方案（條件式多任務 ACT 模型），透過文字指令的切換直接驅動單一模型按壓不同按鈕，驗證語言與影像特徵的區辨聯結能力。
+- **當前進度**：
+  - **[進行中]** 撰寫 [04-practice-6-button-panel.md](docs/04-practice-6-button-panel.md) 紀錄語意驅動模型架構與任務規劃。
+
+### 階段三：視覺-語言-動作大模型 (VLA) 實作
+- **目標**：邁步「層次三」的前沿技術，直接引入 VLA (Vision-Language-Action) 多模態大模型。將驗證它強大的網路常識與 Zero-shot 推論潛力，以自然語言端到端控制複雜影像的按壓行為。
+- **當前進度**：
+  - **[待進行]** 未來預計將實作細節紀錄於 `docs/05-vla-elevator-pressing.md`。
+
+### 階段四：正式任務 (通用電梯泛化按壓測試)
+- **目標**：結合前述階段的架構經驗，收集具備極大多樣性的真實電梯數據，進一步評估所選之大模型框架對於現實世界完全未知的電梯面板，其泛化與按壓成功率。
+- **作法**：上傳百種真實電梯之資料集至 Hugging Face，調整超參數訓練終端泛化通用模型。
+
+### 持續性任務：框架解析與經驗累積
+- **目標**：隨著各階段模型的訓練實作，持續深入剖析與記錄 LeRobot 框架、HuggingFace 以及 WandB 的底層架構與進階工具鏈使用心得。
+- **紀錄文件**：[03-lerobot-framework-anatomy.md](docs/03-lerobot-framework-anatomy.md)
