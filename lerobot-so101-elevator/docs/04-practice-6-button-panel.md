@@ -32,19 +32,56 @@
 
 ---
 
-## 預定執行步驟 (層次二架構)
+## 具體實作與原始碼修改步驟 (層次二架構)
 
-為了實踐層次二的條件式模型，錄製與訓練流程與原本的基礎解法將有所差異：
+要讓原生的 ACT 模型學會「聽懂人話」，必須在 LeRobot 中進行架構級別的改裝（Language-Conditioned ACT Mod）。以下為核心的實作步驟：
 
-### 第一步：多任務資料收集 (Multi-task Data Collection)
-- **收集全集資料**：針對面板上的每一顆按鈕，在不同的起始角度（偏左、偏右、偏高、偏低）分別盡錄製足夠數量的示範軌跡，避免空間 OOD (Out-of-Distribution)。
-- **結合文字特徵錄製**：錄製時，將這 6 顆按鈕的示範存入同一個巨大的資料庫（Dataset Repo）中。並確保每一回合的軌跡都精準帶有專屬的 `single_task` 文字指令標註，像 `"Press button 3 on the 6-button panel"`。
+### 第0步：了解 lerobot 的 ACT 實作
+在動手修改架構之前，先深入理解 LeRobot 預設的原生 ACT 模型實作（原始碼與資料流），確認 Transformer Encoder/Decoder 的實際運作方式，這部分的探討與筆記對應至理論學習的 ACT 分析中，程式碼註解已加入至 [`policies/act/modeling_act.py`](../policies/act/modeling_act.py)。
 
-### 第二步：單一條件式模型訓練 (Language-Conditioned Training)
-- 提取混合了 6 種不同指令與影像特徵的完整資料集送入 LeRobot 進行長時間訓練。
-- 專注訓練出單一一個強大的 ACT 模型。只要模型在訓練階段能成功把各別的文字 Prompt 與影像空間中的 Attention 特徵產生深刻聯結，它就算成功掌握這座面板。
+### 第一步：修改 ACT 網路架構 (注入 Text Embeddings)
 
-### 第三步：實機動態切換推論 (Inference & Evaluation)
-- **單一權重載入**：在推論指令中，`pretrained_path` 將永久指向這顆唯一的收斂大模型。不必再頻繁換腦袋。
-- **字串驅動**：負責啟動機器人的主腳本，直接將使用者說出或輸入的話轉介為 `--dataset.single_task` 字串參數送出。
-- **驗證成果**：驗證機器人是否能不換模型，單靠中控台動態發送的 Prompt 字串，就能立刻改變它去按鈕的目標意圖。
+為保留原始實作，我們已將 `policies/act` 目錄複製一份為 `policies/act_lc`(Language-Conditioned ACT)。接下來的修改都將在 `act_lc` 目錄中進行。
+
+原生 ACT 實作(位於 `lerobot/common/policies/act/modeling_act.py`) 僅接收影像與本體狀態。必須做以下改造：
+
+1. **引入文字編碼器 (Text Encoder)**：
+    - 在 ACT Policy 的 `__init__` 中，載入輕量且推理快速的預訓練語言模型（採用 `distilbert-base-uncased`），並將其權重凍結 (`requires_grad=False`) 以減少機器手臂訓練初期的計算資源負擔與過度擬合問題。
+2. **新增特徵對齊層 (Projection MLP)**：
+    - 文字編碼器輸出的隱藏維度（DistilBERT 為 768）與 ACT 內部 Transformer 的維度（預設為 512）不同。需加入一層 Linear 進行特徵降維與映射：
+    ```python
+    self.text_proj = nn.Linear(config.language_dim, config.hidden_dim)
+    ```
+3. **改造 Transformer Encoder 流水線**：
+    - 原生的 `forward()` 與 `compute_loss()` 需修改為可以接收 `batch` 中的 `language_instruction` 的批次字串，並在內部呼叫 Tokenizer 將字串轉為 `input_ids` 與 `attention_mask`。送入 Text Encoder 與 `text_proj` 後，得到 `text_tokens`（維度為 `(Batch, Seq_Len, 512)`）。
+    - 接著，進入 Transformer (`self.model.encoder`) 之前，將 `text_tokens` 加入至序列中（與 `is_pad`、`z`、`proprioception`、`image_tokens` 串接），這樣 Encoder 的 Self-Attention 機制就會強制讓「語意 Token」與「影像空間 Token」產生跨模態的權重聯結。
+   這樣 Encoder 的 Self-Attention 機制就會強制讓「語意 Token」與「影像空間 Token」產生跨模態的權重聯結。
+4. **驗證**：
+    - 在不開啟正式訓練迴圈的情況下，撰寫一小段 Python 測試腳本，初始化改版後的 ACTPolicy 並模擬輸入 batch (包含一組假影像、假 proprioception 與文字指令 ["press button 3"])。
+    - 確認 forward() 能夠順利產出維度正確的 action_tokens 而不拋出維度不匹配或是 Cuda Memory 錯誤。
+
+
+### 第二步：多任務資料集混合 (Multi-task Data Collection)
+
+1. **指令標註**：
+   在錄製這 6 顆按鈕時，將所有軌跡錄進 **同一個 Repo**，但透過給定特定的 `--dataset.single_task` 來給予模型解題線索：
+   ```bash
+   lerobot-record ... \
+     --dataset.repo_id=RonLiao/lerobot-so101-elevator-6btn-multitask \
+     --dataset.single_task="press button 3" # 錄製按鈕 3 的回合
+   ```
+2. **修改 Dataset 解析器**：
+   確保客製化的 DataLoader 能夠在讀取 Parquet 時，一併將 `language_instruction` (或 `task_index`) 取出並進行 Tokenize，然後與 `observation.state`、`observation.images` 一道包進 dictionary 送入模型。
+
+### 第三步：啟動條件式訓練 (Language-Conditioned Training)
+
+此時不再分開訓練 6 次。一次將混合了上述所有按鈕的巨大 Dataset 餵給改裝後的 ACT。
+- **訓練哲學**：模型在預測馬達位置時，會發現同樣是「六顆按鈕的畫面」，但最佳軌跡卻有 6 種解。這會迫使 Loss 函數推動網路依賴剛加入的 `text_tokens` 作為解題的先驗條件，進而學會「看字決定按哪顆按鈕」的區辨能力。
+
+### 第四步：客製化推論腳本 (Inference Router)
+
+推論時不能直接呼叫預設的 `lerobot-record`。需要自行編寫 Python 腳本（如 `inference_language_act.py`）：
+1. 載入這顆唯一的 Multi-Task ACT Checkpoint。
+2. 開啟一個迴圈接受 `input()` 字串（或是結合 Whisper 的語音辨識端點）。
+3. 將接收到的字串實時編碼為 Vector，餵給模型。
+4. 模型根據當前攝影機畫面，結合該文字 Vector，即時吐出針對特定按鈕的 Action Tokens 控制機械臂！

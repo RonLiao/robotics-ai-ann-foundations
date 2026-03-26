@@ -25,9 +25,9 @@ This repository contains detailed Markdown notes exported from Notion, covering 
 - [x] **Architectures:** FNN, CNN, RNN.
 - [x] **Attention Mechanism:** Transformers & Self-Attention.
 - [x] **Generative Models:** AE, VAE, CVAE.
+- [x] **Embodied AI: ACT**
 
 ### Phase 2: Action Policy & Robotics (In-Progress 🚧)
-- [ ] **Action Chunking with Transformers (ACT)**
 - [ ] **Diffusion Policy**
 - [ ] **Vision-Language-Action (VLA) Models**
 
@@ -38,6 +38,11 @@ I am currently implementing an end-to-end robotic task using the **SO-101 Roboti
 * **Objective:** Generalize elevator button recognition and pressing across various panel designs.
 * **Approach:** Leveraging **ACT** for motion generation while ensuring robust hardware execution through precise **PID Control**.
 * **Data Hub:** Real-world demonstrations are hosted on [Hugging Face Datasets](https://huggingface.co/datasets/RonLiao/lerobot-so101-elevator-dataset).
+* **Models & Monitoring:** Trained model weights are published on [Hugging Face Models](https://huggingface.co/RonLiao/so101-elevator-act) with training loss metrics available on [WandB](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator).
+* **Current Progress:**
+  - **[Phase 1: Completed] Practice Task (Circular Magnet Pressing):** Successfully established the end-to-end LeRobot workflow encompassing real-world data collection, multi-process training, and physical robotic arm inference. Surmounted critical infrastructure hurdles including DataLoader limitations, Docker shared memory (`--shm-size`) crashes, and GPU pass-through permissions.
+  - **[Phase 2: In Progress] Multi-Task Pressing on Specific Panels:** Initiating the implementation of a Language-Conditioned ACT model architecture. The objective is to utilize natural language commands to drive distinct button-pressing tasks out of a 6-button elevator panel.
+  - **[Framework Analysis (Ongoing)]:** Continuously diving into the LeRobot framework architecture, particularly `meta/info.json` properties and Dataset Viewer configurations, to bridge the gap between physical hardware observations and model output dimensions.
 
 ---
 
