@@ -43,7 +43,14 @@
 
 為保留原始實作，我們已將 `policies/act` 目錄複製一份為 `policies/act_lc`(Language-Conditioned ACT)。接下來的修改都將在 `act_lc` 目錄中進行。
 
-原生 ACT 實作(位於 `lerobot/common/policies/act/modeling_act.py`) 僅接收影像與本體狀態。必須做以下改造：
+原生 ACT 實作(位於 `lerobot/common/policies/act/modeling_act.py`) 僅接收影像與本體狀態。以下為架構改造的核心：
+
+**📍 架構變更圖解 (ACT-LC 資料流)：**
+我們將提取出的語意特徵注入到 Transformer Encoder 的輸入端，強制模型進行跨模態注意力計算。
+
+![ACT-LC Architecture](assets/ACT_LC_Architecture.png)
+
+具體必須做以下改造：
 
 1. **引入文字編碼器 (Text Encoder)**：
     - 在 ACT Policy 的 `__init__` 中，載入輕量且推理快速的預訓練語言模型（採用 `distilbert-base-uncased`），並將其權重凍結 (`requires_grad=False`) 以減少機器手臂訓練初期的計算資源負擔與過度擬合問題。
