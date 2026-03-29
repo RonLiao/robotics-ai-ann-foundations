@@ -1,4 +1,4 @@
-# 通用電梯按鈕壓印 (General Elevator Pressing)
+# 通用電梯按鈕按壓 (General Elevator Pressing)
 
 [![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-FFD21E)](https://huggingface.co/datasets/RonLiao/lerobot-so101-elevator-dataset)
 [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-FFD21E)](https://huggingface.co/RonLiao/so101-elevator-act)
@@ -57,7 +57,9 @@
   - **[已完成]** 撰寫 [04-practice-6-button-panel.md](docs/04-practice-6-button-panel.md) 紀錄語意驅動模型架構與任務規劃。
   - **[已完成]** 了解 LeRobot 原生 ACT 模型實作（原始碼與資料流），並於 `modeling_act.py` 加入註解，完成前置作業。
   - **[已完成]** 第一步：修改 ACT 網路架構 (注入 Text Embeddings)。完成建立客製化的 `act_lc` 模型目錄，並透過測試腳本驗證了結合文字編碼器等跨模態網路架構的資料流。
-  - **[待進行]** 第二步：多任務資料集混合 (Multi-task Data Collection)。
+  - **[已完成]** 第二步：多任務資料集混合 (Multi-task Data Collection)。
+  - **[待進行]** 第三步：啟動條件式訓練 (Language-Conditioned Training)。
+    - **[待進行]** 準備並執行 `scripts/train_act_lc.py` 啟動 6 顆按鈕的多任務混合訓練。
 
 ### 階段三：視覺-語言-動作大模型 (VLA) 實作
 - **目標**：邁步「層次三」的前沿技術，直接引入 VLA (Vision-Language-Action) 多模態大模型。將驗證它強大的網路常識與 Zero-shot 推論潛力，以自然語言端到端控制複雜影像的按壓行為。
