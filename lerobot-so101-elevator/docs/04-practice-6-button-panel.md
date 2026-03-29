@@ -46,7 +46,7 @@
 原生 ACT 實作(位於 `lerobot/common/policies/act/modeling_act.py`) 僅接收影像與本體狀態。以下為架構改造的核心：
 
 **📍 架構變更圖解 (ACT-LC 資料流)：**
-我們將提取出的語意特徵注入到 Transformer Encoder 的輸入端，強制模型進行跨模態注意力計算。
+將提取出的語意特徵注入到 Transformer Encoder 的輸入端，強制模型進行跨模態注意力計算。
 
 ![ACT-LC Architecture](assets/ACT_LC_Architecture.png)
 
