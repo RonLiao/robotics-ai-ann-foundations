@@ -57,7 +57,12 @@
   - **[已完成]** 撰寫 [04-practice-6-button-panel.md](docs/04-practice-6-button-panel.md) 紀錄語意驅動模型架構與任務規劃。
   - **[已完成]** 了解 LeRobot 原生 ACT 模型實作（原始碼與資料流），並於 `modeling_act.py` 加入註解，完成前置作業。
   - **[已完成]** 第一步：修改 ACT 網路架構 (注入 Text Embeddings)。完成建立客製化的 `act_lc` 模型目錄，並透過測試腳本驗證了結合文字編碼器等跨模態網路架構的資料流。
-  - **[已完成]** 第二步：多任務資料集混合 (Multi-task Data Collection)。
+  - **[進行中]** 第二步：多任務資料集混合 (Multi-task Data Collection)。
+    - **[已完成]** 建立 `scripts/record_6btn.sh` 多任務錄製輔助腳本與平衡檢查工具。
+    - **[進行中]** 錄製 6 顆按鈕的 demonstrations (目標每顆 50+ Episodes)。
+      - **[已完成]** 解決 Headless 環境下的重置超時與資料集編輯崩潰問題，並實現 5 秒全自動倒數機制。
+      - **[已完成]** 按鈕 1 (`press button 1`) 完成 50 次錄製。
+      - **[待進行]** 完成其餘 5 顆按鈕 (按鈕 2~6) 的錄製，確保資料集數量平衡。
   - **[待進行]** 第三步：啟動條件式訓練 (Language-Conditioned Training)。
     - **[待進行]** 準備並執行 `scripts/train_act_lc.py` 啟動 6 顆按鈕的多任務混合訓練。
 
