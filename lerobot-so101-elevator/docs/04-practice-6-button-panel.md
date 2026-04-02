@@ -93,6 +93,50 @@
   - **泛化解決方案（文字擾動）**：後續在訓練階段可引入「文字擾動 (Text Augmentation)」，例如將標準指令隨機更換為多樣化的說法（如 "press 3"、"go to 3" 或 "button 3"）。
   - **實施建議**：此擾動不建議在錄製時手動為 50 個 Episode 分別輸入不同字串，而應在訓練程式讀取資料時，由 DataLoader 自動進行隨機替換，迫使模型學到「語意相似」即代表「動作相同」，顯著提升系統對自然語言輸入的容錯與泛化能力。
 
+3. **多任務錄製腳本 (Headless 全自動錄製版)**：
+   為了簡化流程並確保標籤一致，使用專用的錄製腳本 `scripts/record_6btn.sh`。由於在 Docker 的 Headless 環境內無法使用鍵盤空白鍵進入下一回合，腳本中特別加入了 `--dataset.reset_time_s=5` 參數。這讓系統在錄影結束後只等待 5 秒，隨即自動進入下一段錄製，實現全程無觸碰的全自動化收集流程：
+   ```bash
+   # 初始化：錄製按鈕 1 的第 1 個 Episode (禁用續傳，用於徹底重建或覆蓋舊有資料集)
+   bash scripts/record_6btn.sh 1 1 false
+
+   # 錄製按鈕 1 的 剩餘49 個回合 (預設續傳模式)
+   bash scripts/record_6btn.sh 1 50
+
+   # 錄製按鈕 2 的 50 個回合 (累積目標 100，使用預設的 true 續傳模式)
+   bash scripts/record_6btn.sh 2 100
+
+   # 錄製按鈕 6 的 50 個回合 (假設前 5 個按鈕已錄了 250 段，此時目標需設為 300)
+   bash scripts/record_6btn.sh 6 300
+   ```
+   此腳本會自動將資料儲存至 `RonLiao/lerobot-so101-elevator-6btn-multitask`，並套用 `--dataset.single_task="press button $N"` 標籤。
+
+4. **指令標註與數據均衡**：
+   在錄製過程中，應隨時使用 `python scripts/check_dataset_balance.py` 檢查各任務進度。
+
+5. **資料集一鍵上傳雲端**：
+   由於錄製腳本為了追求效率，預設關閉了即時上傳 (`--dataset.push_to_hub=false`)。當在本地完成一段錄製（例如錄滿 50 個 Episode）後，可使用以下指令手動將所有資料打包並同步至雲端：
+   ```bash
+   python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset; dataset = LeRobotDataset('RonLiao/lerobot-so101-elevator-6btn-multitask'); dataset.push_to_hub()"
+   ```
+   > [!NOTE]
+   > 這會上傳當前本地快取中該 Repo 的所有內容。上傳完成後，建議檢查 Hugging Face 頁面，確認檔案大小與 `tasks.parquet` 是否符合預期。
+
+- **經驗：首次錄製注意事項 (404 報錯解決方案)**：
+  - 若資料集尚未存在於 Hugging Face 或本地，啟動時會報 `RepositoryNotFoundError` (404)。請按照以下步驟初始化：
+  - **1. 在雲端建立倉庫**：
+    ```bash
+    python -c "from huggingface_hub import HfApi; HfApi().create_repo(repo_id='RonLiao/ lerobot-so101-elevator-6btn-multitask', repo_type='dataset', exist_ok=True)"
+    ```
+  - **2. 執行首次錄製 (禁用續傳)**：
+    務必在指令最後加上 `false` 以關閉 `--resume`：`bash scripts/record_6btn.sh 1 1 false`。
+
+- **經驗：：關於 `num_episodes` 參數**：
+  - 此參數代表資料集內的**總集數目標**。在多任務錄製時，因為所有按鈕共用一個資料集 Repo，後續錄製的目標值必須大於目前已存在的總集數。
+
+- **經驗：遇到錄壞欲刪除 Episode 導致資料毀損 (Metadata Corruption)**
+  - **問題描述**：若因為超時多錄了空白片段，嘗試使用原生的 `lerobot-edit-dataset --operation.type=delete_episodes` 工具刪除時，可能會觸發 V2 版本底層的 Bug，導致 `info.json` 遺失，並引發連鎖反應將 Metadata 破壞，甚至報錯 `RevisionNotFoundError`。
+  - **解決方式**：目前版本中，刪除特定 Episodes 具有高風險。如果不幸讓資料結構毀損，最乾淨解就是砍掉本地快取資料夾重煉 (`rm -rf ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-6btn-multitask`)。
+
 
 ### 第三步：啟動條件式訓練 (Language-Conditioned Training)
 
