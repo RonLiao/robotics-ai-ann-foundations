@@ -13,6 +13,10 @@ class ACTLCDataset(Dataset):
         # 載入原生的 LeRobotDataset
         self.dataset = LeRobotDataset(repo_id, *args, **kwargs)
         
+    def __getattr__(self, name):
+        # 讓包裝類別能夠透傳原生 Dataset 的所有屬性 (例如 .meta, .fps, .features 等)
+        return getattr(self.dataset, name)
+
     def __len__(self):
         return len(self.dataset)
         
