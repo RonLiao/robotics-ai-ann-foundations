@@ -19,7 +19,7 @@
 
 ### 層次一：工程中控台路由 (Wrapper 與權重動態切換)
 本質上仍是傳統的「一個按鈕，訓練一個專屬模型」。首先由外部程式（如 Python 腳本、語法解析器或輕量級 LLM Router）攔截使用者的語音或字串，解析出目標按鈕為何（例如：`target=Btn3`）後，程式再去動態讀取並載入 `btn3` 的權重（pretrained_model）來執行。
-- **特性**：實作簡單直觀，但欠缺泛化性。未來若有百個按鈕，就需要維護百個龐大的模型庫，且切換權重時會有將模型掛載至 VRAM 的載入延遲。
+- **特性**：實作簡單直觀，但欠缺泛化性。未來若有百個按鈕，則需維護百個龐大的模型庫，且切換權重時會有將模型掛載至 VRAM 的載入延遲。
 
 ### 層次二：條件式輸入的多任務模型 (Language-Conditioned ACT)
 **【⭐ 本階段 (04 筆記) 先行採用的方案】**
@@ -41,7 +41,7 @@
 
 ### 第一步：修改 ACT 網路架構 (注入 Text Embeddings)
 
-為保留原始實作，我們已將 `policies/act` 目錄複製一份為 `policies/act_lc`(Language-Conditioned ACT)。接下來的修改都將在 `act_lc` 目錄中進行。
+為保留原始實作，已將 `policies/act` 目錄複製一份為 `policies/act_lc`(Language-Conditioned ACT)。接下來的修改都將在 `act_lc` 目錄中進行。
 
 原生 ACT 實作(位於 `lerobot/common/policies/act/modeling_act.py`) 僅接收影像與本體狀態。以下為架構改造的核心：
 
@@ -80,13 +80,13 @@
 
 2. **修改 Dataset 解析器**：
    因為原生的 `LeRobotDataset` 預設只回傳數值型與影像特徵，為了讓改版後的 ACT-LC 模型能順利讀取到文字指令，必須撰寫一個 Wrapper 類別（實作了 `ACTLCDataset`）。
-   - **實作邏輯**：在 `__getitem__` 取資料時，攔截當下回傳的字典，並從 `item["task_index"]` 查詢資料集自帶的 `meta/info.json`。提取出對應的 task string 後，手動將其注入到 `item["language_instruction"]` 欄位中供 `DistilBERT` 編碼。
+   - **實作邏輯**：在 `__getitem__` 取資料時，攔截當下回傳的字典，並拿取當前的 `task_idx = item["task_index"].item()`。接著直接從底層已載入記憶體的 `self.dataset.tasks` 映射表中（在 v3.0 架構下，數據來自 `meta/tasks.parquet`）調閱出對應的 instruction string，最後將其注入到 `item["language_instruction"]` 欄位中供 `DistilBERT` 編碼。
 
 - **經驗：為何在多任務混合錄製時，需要給定特定的 `--dataset.single_task`？**
   - **核心考量**：正常邏輯下，錄製 Episode 前應給定一串指令（比如"press button 3"，並補入每一幀 (Frame) 的數據中。但此舉會導致同一 Episode 的每個 Frame 都存入完全重複的文字，造成嚴重的空間浪費。
   - **既有機制**：LeRobot 框架分為 Dataset/Episode/Frame 三層級。每個 Episode 附帶一個 `task_index`，並自動包含於該 Episode 下的所有 Frame 中。
   - **優化策略**：既然每個 Frame 原來就有 `task_index`，且指令字串也是以 Episode 為單位，故直接沿用此索引。訓練時透過 `act_lc_dataset.py` 將索引動態展開為“dataset.single_task"指定的對應文字指令，達成節省資料夾體積但訓練具備語意輸入的效果。
-  - **參數價值**：`--dataset.single_task` 用於「為該次錄製的所有 Episode 下定義」，它會將此標籤存於 `meta/info.json` 中，符合上面提到的需求。此外也能避免每個 Episode 都需手動輸入字串，支援一次錄製多個 Episode。
+  - **參數價值**：`--dataset.single_task` 用於「為該次錄製的所有 Episode 下定義」，在 v3.0 架構下它會將此標籤自動登記於字串映射表 `meta/tasks.parquet` 中（取代了舊版存於 info.json 的作法），符合上面提到的需求。此外也能避免每個 Episode 都需手動輸入字串，支援一次錄製多個 Episode。
 
 - **經驗：推論時若輸入略有不同的字串（如 "3" 或 "button 3"）還能運作嗎？**
   - **初期現狀**：雖然 `DistilBERT` 具備語意理解能力（換句話說，這兩個字串經過DistilBERT編碼後，會得到非常接近的向量），但 ACT 模型目前訓練時僅見過極少數的特定 Embedding。若推論時輸入未曾對齊過動作的字串，即便語意接近，仍極可能失敗。此階段建議維持與錄製時 **完全一致** 的指令。
@@ -102,11 +102,11 @@
    # 錄製按鈕 1 的 剩餘49 個回合 (預設續傳模式)
    bash scripts/record_6btn.sh 1 50
 
-   # 錄製按鈕 2 的 50 個回合 (累積目標 100，使用預設的 true 續傳模式)
-   bash scripts/record_6btn.sh 2 100
+   # 錄製按鈕 2 的 50 個回合 (錄制50回合，使用預設的 true 續傳模式)
+   bash scripts/record_6btn.sh 2 50
 
-   # 錄製按鈕 6 的 50 個回合 (假設前 5 個按鈕已錄了 250 段，此時目標需設為 300)
-   bash scripts/record_6btn.sh 6 300
+   # 錄製按鈕 6 的 50 個回合 (同上)
+   bash scripts/record_6btn.sh 6 50
    ```
    此腳本會自動將資料儲存至 `RonLiao/lerobot-so101-elevator-6btn-multitask`，並套用 `--dataset.single_task="press button $N"` 標籤。
 
@@ -130,9 +130,6 @@
   - **2. 執行首次錄製 (禁用續傳)**：
     務必在指令最後加上 `false` 以關閉 `--resume`：`bash scripts/record_6btn.sh 1 1 false`。
 
-- **經驗：：關於 `num_episodes` 參數**：
-  - 此參數代表資料集內的**總集數目標**。在多任務錄製時，因為所有按鈕共用一個資料集 Repo，後續錄製的目標值必須大於目前已存在的總集數。
-
 - **經驗：遇到錄壞欲刪除 Episode 導致資料毀損 (Metadata Corruption)**
   - **問題描述**：若因為超時多錄了空白片段，嘗試使用原生的 `lerobot-edit-dataset --operation.type=delete_episodes` 工具刪除時，可能會觸發 V2 版本底層的 Bug，導致 `info.json` 遺失，並引發連鎖反應將 Metadata 破壞，甚至報錯 `RevisionNotFoundError`。
   - **解決方式**：目前版本中，刪除特定 Episodes 具有高風險。如果不幸讓資料結構毀損，最乾淨解就是砍掉本地快取資料夾重煉 (`rm -rf ~/.cache/huggingface/lerobot/RonLiao/lerobot-so101-elevator-6btn-multitask`)。
@@ -146,17 +143,96 @@
 **具體實施步驟：**
 1. **資料集準備**：確保已錄製足夠的多任務 Episode (建議每顆按鈕 50+ 個)，並上傳至 Hugging Face。
 2. **訓練環境配置**：啟動 Docker 容器並掛載 `ron_so101_v2` 環境。
-3. **執行訓練腳本 (`scripts/train_act_lc.py`)**：
-   此腳本將整合 `ACTLCDataset` 與 `act_lc` policy，並調用 `lerobot` 的訓練循環。需指定以下關鍵參數：
-   - `dataset.repo_id`: 您的多任務資料集 ID。
-   - `policy.path`: 指向 `policies/act_lc` 的本地路徑。
-   - `training.batch_size`: 根據顯存調整 (建議 16 或以上)。
+3. **執行自定義訓練腳本 (`scripts/train_act_lc.py`)**：
+   執行腳本並傳入標準的參數：
+   ```bash
+   python scripts/train_act_lc.py \
+     --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-multitask" \
+     --policy.type="act" \
+     --batch_size=16 \
+     --eval_freq=10000 \
+     --save_freq=10000 \
+     --save_checkpoint=true \
+     --policy.push_to_hub=false \
+     --wandb.enable=true \
+     --wandb.project="lerobot-so101-elevator-lc" \
+     --output_dir="outputs/train/act_lc_btn_1_to_3" \
+     --job_name="act_lc_btn_1_to_3"
+   ```
 4. **監控與驗證**：透過 WandB 觀察不同任務指令下，Loss 曲線是否穩定下降並收斂。
 
-### 第四步：客製化推論腳本 (Inference Router)
+- **經驗：在不修改框架核心原始碼下注入新模型結構 (Monkey-patch 套件架構設計)**
+  - **背景問題**：若要向 LeRobot 新增一種模型架構 (如 `act_lc`)，傳統做法必須將程式碼寫進 `/lerobot/src/...` 並修改框架的 Config Parser。這會導致客製化程式碼離開當前 GitHub 專案，降低可維護性並衍生版本衝突問題。
+  - **另外一項誤區**：指令中的 `--policy.path` 是設計用來「讀取預訓練權重資料夾」的，不能用於載入本地的未註冊網路架構（兩者共存會拋出 `argparse.ArgumentError`）。
+  - **解決方案**：採用 **動態攔截 (Monkey-patch)**。刻意撰寫了一份啟動外掛腳本 (`train_act_lc.py`)，利用 `runpy` 在同一個 Process 中呼叫 `lerobot-train`。在此之前，系統會先偷偷將記憶體中原生 LeRobot 的 `ACTPolicy` 與 `LeRobotDataset` 指標，替換 (Patch) 成自定義的 `CustomACTPolicy` 和 `ACTLCDataset`。
+  - **優化優勢**：成功借用了原生 `--policy.type="act"` 的合法執行通道，但底層引擎已經實施掉包！此作法使得所有客製化語意模型邏輯、數據處理層都能「100% 留在當前的獨立專案」內。
+  - **新增特點：結合 `TeeLogger` 進行日誌雙軌儲存**：包裝腳本也藉機攔截了 `sys.stdout` 與 `sys.stderr`，在啟動訓練時能在 `record/` 資料夾自動生成日誌，等同於 bash 的 `tee -a`，方便無縫保存數據供後續覆盤驗證。
 
-推論時不能直接呼叫預設的 `lerobot-record`。需要自行編寫 Python 腳本（如 `inference_language_act.py`）：
-1. 載入這顆唯一的 Multi-Task ACT Checkpoint。
-2. 開啟一個迴圈接受 `input()` 字串（或是結合 Whisper 的語音辨識端點）。
-3. 將接收到的字串實時編碼為 Vector，餵給模型。
-4. 模型根據當前攝影機畫面，結合該文字 Vector，即時吐出針對特定按鈕的 Action Tokens 控制機械臂！
+- **經驗：首度條件式訓練 (按鈕 1-3) 成果分析**：
+   - **訓練日誌 (GitHub)**：[act_lc_train_20260422_195628.log](../record/act_lc_train_20260422_195628.log)
+
+   這是首度成功跑完 100,000 steps、帶有文字指令條件 (Language-Conditioned) 的多任務模型訓練。從記錄中解析出以下關鍵指標與計步參數的涵義：
+
+  1. **訓練效能與時長**：
+     - **硬體**：NVIDIA GeForce GTX 1080 Ti (11GB VRAM)。
+     - **總耗時**：約 **8 小時 40 分鐘** (自 19:56 啟動至隔日 04:39 結束)。
+     - **更新速率 (updt_s)**：單次 GPU 計算耗時穩定維持在 **0.29 秒**。
+     - **資料載入延遲 (data_s)**：平均僅 **0.019 秒**。
+     - **分析**：這代表硬體 CPU/SSD 效能充足且多線程設定得宜 (`num_workers=4`)，完全沒有因為載入大量的多任務影像而產生 I/O 瓶頸。儘管加入了 Language Embedding 加工作業，計算效率依然維持絕佳表現。
+
+  2. **Loss 與收斂趨勢**：
+     - **誤差下降**：Loss 從初始的 **6.078** (step 200) 平穩下降至結尾的 **0.034** (step 100K)。
+     - **梯度穩定度 (grdn)**：從起初的 **113** 完美降落至最後約 **2.0** 的平緩谷底。
+     - **分析**：全程完全無任何反彈、震盪或梯度爆炸 (Exploding Gradients)。因為 ACT 只要降至 0.1 以下就代表學習極佳，此異常精準的誤差值證實了模型不只死背熟了這 3 顆按鈕的位置，更「成功抓到了使用文字指令做為預測條件的區分規律」。
+
+  3. **重要計步器參數解讀 (`ep` 與 `epch`)**：
+     - **`step` (步數)**：執行優化器更新（Forward + Backpropagation）的次數，本次設定為上限的 100K 萬步。
+     - **`ep` (Episodes)**：訓練過程中所抽樣處理了總計多少回合 (Episode)。這有助於確認 DataLoader 在處理混合式多任務時，是否有順暢地載入並堆疊資料。
+     - **`epch` (Epochs)**：代表模型「完整看完 150 筆 Episodes」的週期總數。在 10 萬步結束時值約為 **44.28**，代表在這 8 多小時的訓練期間，模型反覆研讀了這批錄製資料整整 44 遍。
+
+- **經驗：自訂網路架構的訓練權重手動上傳 (Push Custom Model to Hugging Face)**：
+  由於訓練指令中加上了 `--policy.push_to_hub=false`，權重目前只保留在本地伺服器。若後續想手動備份到雲端，由於模型已加上 Language Embedding，**重新建立一個帶有後綴（如 `-lc`）的新 Repository**，避免覆蓋掉第一階段的純視覺舊模型。操作上沿用之前舊模型上傳的方式，進入 LeRobot scripts 目錄執行：
+
+  ```bash
+  # 使用最穩定的 Python API 方式上傳 (程式會自動建立 Repo 並上傳)
+  python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-lc-btn-1-to-3'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_lc_btn_1_to_3/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model')"
+  ```
+
+  > [!TIP]
+  > 這邊特別指定只上傳 `checkpoints/last/pretrained_model` 子資料夾。因為它裡頭包含了乾淨的模型權重 (`model.safetensors`) 與結構設定檔 (`config.json`)，是推論時真正需要的東西。這麼做可以避免把訓練過程產生的龐大 Optimizer 暫存狀態一併上傳，省下巨量的雲端儲存空間。
+
+### 第四步：客製化推論腳本 (Inference Router)
+ 
+由於原廠的錄製與評價工具（如 `lerobot-record`）無法動態接收外部字串作為模型輸入，因此自行實作了 `scripts/inference_language_act.py` 作為推論中控台：
+ 
+ 1. **模型載入與初始化**：
+    - 直接引用自定義的 `from policies.act_lc.modeling_act import ACTPolicy`。
+    - 透過 `from_pretrained("RonLiao/so101-elevator-act-lc-btn-1-to-3")` 自動從 Hugging Face 雲端（或本地快取）拉取權重與 config。
+ 2. **互動式指令迴圈 (Interactive CLI)**：
+    - 啟動後進入 `While True` 模式，程式會暫停並等待使用者輸入指令（例：`press button 3`）。
+    - 支援 `--dummy` 模式，在不連接實體手臂的情況下也能驗證語言特徵是否順利注入 Policy。
+ 3. **多步執行子迴圈 (Action Execution Loop)**：
+    - 當接收到指令後，系統會自動開啟一個為期 200 步（可透過 `--num_steps` 調整）的子迴圈。
+    - 在每一小步 (Step) 中，即時抓取影像與關節狀態，並將使用者輸入的指令附加在 `observation["language_instruction"]` 欄位中，讓 DistilBERT 產出條件向量。
+ 4. **硬體下發與對齊**：
+    - 使用 `make_robot()` 建構連線，獲取預測動作後透過 `robot.send_action()` 送往馬達執行。
+
+**驗證指令與結果：**
+```bash
+# 執行離線虛擬測試
+python scripts/inference_language_act.py --dummy
+
+# 執行驗證輸出
+# 🎯 鎖定特徵注入條件: [ press button 3 ] - 開始執行任務...
+#   ↳ [Step 0] 位移量: 0.000000
+#   ↳ [Step 50] 位移量: 0.055191
+#   ⏱️ 單次決策總耗時: 0.230 秒
+# ✅ 任務執行完畢，回到待命狀態。
+```
+
+- **經驗：引入「自動靜止停止機制」優化任務銜接速率**：
+  - **核心問題**：ACT 模型本身沒有「終止標籤」，導致傳統做法必須跑滿固定的步數（如 200 步）才能停下來。若模型在第 100 步就已經按完按鈕並縮回，剩下的 100 步就會變成無謂的等待。
+  - **解決方案**：在推論迴圈中加入 **「位移量監控 (Stationary Detection)」**。
+    - 運算邏輯：計算當前指令 $a_t$ 與前一步指令 $a_{t-1}$ 的歐幾里德距離。
+    - 判定準則：當位移量連續 15 步（可透過 `--stop_patience` 調整）低於閾值 `0.001` 時，判定模型已進入「收斂靜止狀態」。
+  - **實際效益**：手臂完成按壓任務並回到初始位置後，系統會立即自動跳出迴圈並顯示「任務完成」，無需手動干預或盲目等待，大幅提升了連續多任務（如：按完 3 樓再按 5 樓）的測試效率。
