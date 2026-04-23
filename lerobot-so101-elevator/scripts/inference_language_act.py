@@ -57,9 +57,34 @@ def main():
     # ==========================
     print(f"\n📥 正在從 {args.repo_id} 載入預訓練模型 ({args.device})...")
     policy = ACTPolicy.from_pretrained(args.repo_id)
+    
+    # 【📍 終極修正】：補齊所有缺失的語言模型屬性 (Config Hotfix)
+    if not hasattr(policy.config, "language_model_name") or policy.config.language_model_name is None:
+        policy.config.language_model_name = "bert-base-uncased"
+        policy.config.max_text_length = 512
+        policy.config.language_dim = 768
+        print("🔧 Config 修復: 補齊 language_model_name, max_text_length, language_dim")
+        
+        # 手動初始化 Tokenizer
+        from transformers import AutoTokenizer
+        policy.tokenizer = AutoTokenizer.from_pretrained(policy.config.language_model_name, clean_up_tokenization_spaces=True)
+        print("✅ Tokenizer 初始化成功！")
+    
     policy.eval()
     policy.to(args.device)
     print("✅ 模型載入與初始化完畢！")
+
+    # 【📍 偵錯與診斷】
+    if hasattr(policy, "stats") and policy.stats:
+        print(f"📊 偵測到歸一化規格 (Stats): {list(policy.stats.keys())}")
+        if "observation.state" in policy.stats:
+            s_mean = policy.stats["observation.state"]["mean"]
+            print(f"   - State Mean (前三維): {s_mean[:3]}")
+    
+    if hasattr(policy.config, "language_model_name"):
+        print(f"🌍 語言模型名稱: {policy.config.language_model_name}")
+    else:
+        print("⚠️  警告: 此 Policy Config 無 language_model_name，指令將無效。")
 
     # ==========================
     # 2. 初始化機械臂與攝影機連線
@@ -140,9 +165,18 @@ def main():
                         img = raw_obs["front"]
                         if not isinstance(img, torch.Tensor):
                             img = torch.from_numpy(img)
+                        # if img.ndim == 3 and img.shape[-1] == 3:
+                        #     img = img.permute(2, 0, 1)
+                        
+                        # 【📍 色域排查紀錄】：BGR 翻轉在測試中無效，暫時保持原樣
+                        # img = img[[2, 1, 0], :, :]
+                        
                         if img.ndim == 3 and img.shape[-1] == 3:
                             img = img.permute(2, 0, 1)
+                        
+                        # 【📍 必備處理】：轉換為浮點數並歸一化，防止 ByteTensor 報錯
                         img = img.float() / 255.0
+                        
                         observation["observation.images.front"] = img.unsqueeze(0).to(args.device)
                     
                     # 2. 整合 6 維狀態 (依序尋找關節)
