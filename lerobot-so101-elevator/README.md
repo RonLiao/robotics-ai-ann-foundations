@@ -27,11 +27,6 @@
 - `record/`：錄製的 demonstrations 數據（.parquet 與影片）。
 - **Hugging Face Dataset**: [RonLiao/lerobot-so101-elevator-dataset](https://huggingface.co/datasets/RonLiao/lerobot-so101-elevator-dataset)
 
-## 當前狀態
-
-1. **環境與校正**：已建立支援 GPU 加速與 32GB Shared Memory 的 Docker 容器 (`ron_so101_v2`)。裝置權限與手臂校正檔已透過 symbolic link 連結，確保錄製與訓練一致性。
-2. **硬體觀測**：確認 Leader Arm 的 `wrist_roll` 關節異常可透過「不重複執行 `lerobot-calibrate`」來規避，詳見 [01-setup-and-calibration.md](docs/01-setup-and-calibration.md)。
-
 ## 開發規劃 (Roadmap)
 
 本任務拆分為四個階段進行：
@@ -57,14 +52,30 @@
   - **[已完成]** 撰寫 [04-practice-6-button-panel.md](docs/04-practice-6-button-panel.md) 紀錄語意驅動模型架構與任務規劃。
   - **[已完成]** 了解 LeRobot 原生 ACT 模型實作（原始碼與資料流），並於 `modeling_act.py` 加入註解，完成前置作業。
   - **[已完成]** 第一步：修改 ACT 網路架構 (注入 Text Embeddings)。完成建立客製化的 `act_lc` 模型目錄，並透過測試腳本驗證了結合文字編碼器等跨模態網路架構的資料流。
-  - **[進行中]** 第二步：多任務資料集混合 (Multi-task Data Collection)。
+  - **[已完成]** 第二步：多任務資料集混合 (Multi-task Data Collection)。
     - **[已完成]** 建立 `scripts/record_6btn.sh` 多任務錄製輔助腳本與平衡檢查工具。
-    - **[進行中]** 錄製 6 顆按鈕的 demonstrations (目標每顆 50+ Episodes)。
+    - **[已完成]** 錄製 3 顆按鈕的 demonstrations (目標每顆 70+ Episodes)。
       - **[已完成]** 解決 Headless 環境下的重置超時與資料集編輯崩潰問題，並實現 5 秒全自動倒數機制。
       - **[已完成]** 按鈕 1 (`press button 1`) 完成 50 次錄製。
-      - **[待進行]** 完成其餘 5 顆按鈕 (按鈕 2~6) 的錄製，確保資料集數量平衡。
-  - **[待進行]** 第三步：啟動條件式訓練 (Language-Conditioned Training)。
-    - **[待進行]** 準備並執行 `scripts/train_act_lc.py` 啟動 6 顆按鈕的多任務混合訓練。
+      - **[已完成]** 按鈕 2 (`press button 2`) 完成 50 次錄製。
+      - **[已完成]** 按鈕 3 (`press button 3`) 完成 50 次錄製。
+      - **[已完成]** 三個按鍵各補錄 20 個 Episode（50 → 70），維持資料集平衡後重新訓練。
+      - **[待進行]** 完成其餘 3 顆按鈕 (按鈕 4~6) 的錄製（保留後續擴充）。
+  - **[已完成]** 第三步：啟動條件式訓練 (Language-Conditioned Training)。
+    - v1 模型（各 50 Episodes）：實作 `scripts/train_act_lc.py`，完成首次 100K 步訓練，Loss 收斂至 0.034。
+    - **[已完成]** 實作自定義推論路由 `inference_language_act.py`。
+    - **[已完成]** 實作 Deep Model Hotfix 解決 Config 殘缺問題（手動注入編碼組件）。
+    - **[已完成]** 實作基於位移監控的任務完成「自動靜止停止機制」。
+    - **[已完成]** 解決 `observation.state` 歸一化參數對齊問題，修復手臂亂舞行為（自動同步 `stats.json` 並實作 `(x-mean)/std` 正規化與反正規化）。
+    - **[已完成]** 完成首次實機推論部署，手臂可平滑執行軌跡不亂舞，推論引擎正常運作。
+    - **[已完成]** 建立 `scripts/check_train_frames.py` 與 `--save_frame` 推論首幀存檔機制，並完成訓練集與推論時相機視角比對，確認視角一致（Camera Calibration Drift 已排除）。
+    - **[已完成]** 補錄資料並重訓 (v2)，驗證是否解決 Mode Collapse 導致定位失敗的問題
+    - v2 模型（各 70 Episodes）：補錄資料後重訓，上傳至 `RonLiao/so101-elevator-act-lc-btn-1-to-3-v2`。
+  - **[已完成]** 第四步：實機推論部署。
+    - 實作 `scripts/inference_language_act.py` 推論中控台，含自動靜止停止機制。
+    - 修正歸一化 (`stats.json`) 對齊問題，解決手臂亂舞問題。
+    - 診斷並修正 Language Model 不一致問題（`bert` 誤用為 `distilbert`），確認 v2 模型語言條件已生效。
+    - **[已確認瓶頸]** 全景相機視角在「最後 5cm」缺乏近距離視覺反饋，無法精確區分相鄰按鈕。
 
 ### 階段三：視覺-語言-動作大模型 (VLA) 實作
 - **目標**：邁步「層次三」的前沿技術，直接引入 VLA (Vision-Language-Action) 多模態大模型。將驗證它強大的網路常識與 Zero-shot 推論潛力，以自然語言端到端控制複雜影像的按壓行為。

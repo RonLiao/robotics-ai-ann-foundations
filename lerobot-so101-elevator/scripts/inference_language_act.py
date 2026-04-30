@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser(description="Language-Conditioned ACT Inference Router")
     
     # 硬體環境與模型參數預設值
-    parser.add_argument("--repo_id", type=str, default="RonLiao/so101-elevator-act-lc-btn-1-to-3", help="Hugging Face Model Repo")
+    parser.add_argument("--repo_id", type=str, default="RonLiao/so101-elevator-act-lc-btn-1-to-3-v2", help="Hugging Face Model Repo or local checkpoint path")
     parser.add_argument("--robot_type", type=str, default="so101_follower", help="Robot identifier for LeRobot")
     parser.add_argument("--robot_id", type=str, default="my_awesome_follower_arm", help="您在錄製資料時賦予手臂的 ID")
     parser.add_argument("--robot_port", type=str, default="/dev/ttyACM1", help="Serial port for the follower arm")
@@ -45,6 +45,8 @@ def main():
     # 測試模式與推論裝置
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="推理硬體裝置")
     parser.add_argument("--dummy", action="store_true", help="使用模擬資料進行測試，不連接真實手臂")
+    parser.add_argument("--save_frame", type=str, default="outputs/train_frames/inference_frame.png",
+                        help="儲存推論首幀影像的路徑（用於和訓練集畫面對比），設為空字串可停用")
     
     args = parser.parse_args()
 
@@ -58,29 +60,78 @@ def main():
     print(f"\n📥 正在從 {args.repo_id} 載入預訓練模型 ({args.device})...")
     policy = ACTPolicy.from_pretrained(args.repo_id)
     
-    # 【📍 終極修正】：補齊所有缺失的語言模型屬性 (Config Hotfix)
+    # 【📍 終極修正】：補齊所有缺失的語言模型屬性與內部組件 (Deep Model Hotfix)
     if not hasattr(policy.config, "language_model_name") or policy.config.language_model_name is None:
-        policy.config.language_model_name = "bert-base-uncased"
-        policy.config.max_text_length = 512
+        # Must match configuration_act.py: language_model_name = "distilbert-base-uncased"
+        policy.config.language_model_name = "distilbert-base-uncased"
+        policy.config.max_text_length = 16  # matches configuration_act.py default
         policy.config.language_dim = 768
-        print("🔧 Config 修復: 補齊 language_model_name, max_text_length, language_dim")
+        print("🔧 Config 修復: 補齊基礎屬性")
         
-        # 手動初始化 Tokenizer
-        from transformers import AutoTokenizer
+        from transformers import AutoTokenizer, AutoModel
+        import torch.nn as nn
+        
+        # 1. 修復 Policy 層 (外層)
         policy.tokenizer = AutoTokenizer.from_pretrained(policy.config.language_model_name, clean_up_tokenization_spaces=True)
-        print("✅ Tokenizer 初始化成功！")
+        print(f"🌍 使用 Tokenizer: {policy.config.language_model_name}")
+        
+        # 2. 修復 Model 層 (內層)
+        if not hasattr(policy.model, "text_encoder"):
+            print("🔧 模型組件修復: 注入 text_encoder 與 text_proj...")
+            policy.model.text_encoder = AutoModel.from_pretrained(policy.config.language_model_name).to(args.device)
+            # 凍結 text_encoder 參數 (與訓練時一致)
+            for param in policy.model.text_encoder.parameters():
+                param.requires_grad = False
+            
+            # 根據 BERT (768) 與模型維度 (通常是 512) 建立投影層
+            policy.model.text_proj = nn.Linear(policy.config.language_dim, policy.model.config.dim_model).to(args.device)
+            
+            # 【📍 關鍵補齊】：文字位置編碼 (Positional Embedding for Text)
+            policy.model.encoder_text_feat_pos_embed = nn.Embedding(policy.config.max_text_length, policy.model.config.dim_model).to(args.device)
+            print("✅ 內部組件與位置編碼初始化成功！")
     
     policy.eval()
     policy.to(args.device)
     print("✅ 模型載入與初始化完畢！")
 
-    # 【📍 偵錯與診斷】
+    # ==========================
+    # 1.5. 【📍 全域歸一化參數預載 (Stats)】
+    # ==========================
+    global_stats_to_use = None
     if hasattr(policy, "stats") and policy.stats:
-        print(f"📊 偵測到歸一化規格 (Stats): {list(policy.stats.keys())}")
-        if "observation.state" in policy.stats:
-            s_mean = policy.stats["observation.state"]["mean"]
+        global_stats_to_use = policy.stats
+        print(f"📊 偵測到模型自帶歸一化規格 (Stats): {list(global_stats_to_use.keys())}")
+        if "observation.state" in global_stats_to_use:
+            s_mean = global_stats_to_use["observation.state"]["mean"]
             print(f"   - State Mean (前三維): {s_mean[:3]}")
-    
+    else:
+        print("📥 模型缺少 Stats，嘗試從 Hugging Face Hub (RonLiao/lerobot-so101-elevator-6btn-multitask) 讀取...")
+        import json
+        from huggingface_hub import hf_hub_download
+        import shutil
+        meta_path = os.path.join(root_dir, "configs", "stats.json")
+        if not os.path.exists(meta_path):
+            try:
+                dl_path = hf_hub_download(repo_id="RonLiao/lerobot-so101-elevator-6btn-multitask", filename="meta/stats.json", repo_type="dataset")
+                os.makedirs(os.path.dirname(meta_path), exist_ok=True)
+                shutil.copy(dl_path, meta_path)
+            except Exception as e:
+                print(f"⚠️ 下載失敗: {e}")
+                meta_path = None
+        if meta_path and os.path.exists(meta_path):
+            try:
+                with open(meta_path, 'r') as f:
+                    raw_stats = json.load(f)
+                    global_stats_to_use = {}
+                    for k, v in raw_stats.items():
+                        global_stats_to_use[k] = {
+                            "mean": torch.tensor(v["mean"] if isinstance(v, dict) else v[0]),
+                            "std": torch.tensor(v["std"] if isinstance(v, dict) else v[1]),
+                        }
+                print("🔧 成功全域載入歸一化 Stats！")
+            except Exception as e:
+                print(f"⚠️ 讀取本機 Stats 失敗: {e}")
+
     if hasattr(policy.config, "language_model_name"):
         print(f"🌍 語言模型名稱: {policy.config.language_model_name}")
     else:
@@ -165,21 +216,30 @@ def main():
                         img = raw_obs["front"]
                         if not isinstance(img, torch.Tensor):
                             img = torch.from_numpy(img)
-                        # if img.ndim == 3 and img.shape[-1] == 3:
-                        #     img = img.permute(2, 0, 1)
-                        
-                        # 【📍 色域排查紀錄】：BGR 翻轉在測試中無效，暫時保持原樣
-                        # img = img[[2, 1, 0], :, :]
-                        
                         if img.ndim == 3 and img.shape[-1] == 3:
                             img = img.permute(2, 0, 1)
                         
-                        # 【📍 必備處理】：轉換為浮點數並歸一化，防止 ByteTensor 報錯
+                        # 【📍 關鍵修正】：與訓練保持一致，使用 RGB 色域
+                        img = img[[2, 1, 0], :, :]
                         img = img.float() / 255.0
-                        
                         observation["observation.images.front"] = img.unsqueeze(0).to(args.device)
+
+                        # -- Save first frame for visual comparison --
+                        if s == 0 and args.save_frame:
+                            try:
+                                from PIL import Image as PilImage
+                                save_img = img.clamp(0.0, 1.0)
+                                pil_img = PilImage.fromarray(
+                                    (save_img.permute(1, 2, 0).numpy() * 255).astype("uint8")
+                                )
+                                os.makedirs(os.path.dirname(os.path.abspath(args.save_frame)), exist_ok=True)
+                                pil_img.save(args.save_frame)
+                                print(f"📸 推論首幀已儲存: {args.save_frame}")
+                                print(f"   → 請與 outputs/train_frames/front/grid_press_button_*.png 並排比較")
+                            except Exception as _e:
+                                print(f"⚠️ 儲存首幀失敗: {_e}")
                     
-                    # 2. 整合 6 維狀態 (依序尋找關節)
+                    # 2. 整合 6 維狀態
                     joint_names = [
                         'shoulder_pan.pos', 'shoulder_lift.pos', 'elbow_flex.pos', 
                         'wrist_flex.pos', 'wrist_roll.pos', 'gripper.pos'
@@ -194,7 +254,23 @@ def main():
                     if len(joint_values) == 6:
                         observation["observation.state"] = torch.tensor([joint_values], dtype=torch.float32).to(args.device)
                     
-                    # 3. 補上指令 (文字)
+                    # 3. 【📍 核心修復】：終極歸一化 (Hardcore Normalization)
+                    # 如果 policy 沒有 stats，我們必須從資料集硬讀，否則手臂會亂飛
+                    if hasattr(policy, "normalize_inputs"):
+                        observation = policy.normalize_inputs(observation)
+                    else:
+                        if global_stats_to_use:
+                            for k in ["observation.images.front", "observation.state"]:
+                                if k in observation and k in global_stats_to_use:
+                                    stat = global_stats_to_use[k]
+                                    if "state" in k:
+                                        mean = stat["mean"].to(args.device)
+                                        std = stat["std"].to(args.device)
+                                        observation[k] = (observation[k] - mean) / (std + 1e-8)
+                        elif s == 0:
+                            print("🚨 嚴重警告: 找不到歸一化參數，模型推論極可能會完全失控！")
+                    
+                    # 4. 補上指令 (文字)
                     observation["language_instruction"] = [cmd] 
 
                 # 【📍 偵錯輸出】
@@ -208,6 +284,15 @@ def main():
                 # 模型推論 (不寫入梯度)
                 with torch.no_grad():
                     action = policy.select_action(observation)
+
+                # 【📍 補齊遺漏的反正規化 (Unnormalization)】
+                # 如果我們使用 global_stats_to_use 且模型內部缺少反正規化，必須手動反推物理量！
+                if not hasattr(policy, "unnormalize_outputs") and global_stats_to_use and "action" in global_stats_to_use:
+                    act_mean = global_stats_to_use["action"]["mean"].to(action.device)
+                    act_std = global_stats_to_use["action"]["std"].to(action.device)
+                    action = action * act_std + act_mean
+                elif hasattr(policy, "unnormalize_outputs"):
+                    action = policy.unnormalize_outputs(action)
                 
                 # 自動適應 2D/3D 並取最新一步動作
                 current_action = action.squeeze(0).cpu() if action.dim() > 2 else action.cpu()

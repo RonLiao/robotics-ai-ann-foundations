@@ -217,7 +217,7 @@
  4. **硬體下發與對齊**：
     - 使用 `make_robot()` 建構連線，獲取預測動作後透過 `robot.send_action()` 送往馬達執行。
 
-**驗證指令與結果：**
+- **驗證指令與結果：**
 ```bash
 # 執行離線虛擬測試
 python scripts/inference_language_act.py --dummy
@@ -239,25 +239,122 @@ python scripts/inference_language_act.py --dummy
 
 - **經驗：推論失敗與異常行為**
 
-在實機部署初期，發生了推論成功啟動但手臂完全無法定位按鈕的問題。
+  在實機部署初期，接連發生了多個推論問題，依時間順序分為兩個階段。
 
-**故障現象：**
-手臂雖然接收到指令並開始動作，但動作路徑完全偏離目標，出現甩動或在空中亂舞的現象。典型的失敗錄像如下：
+  **第一階段：手臂亂舞（推論啟動但完全偏離目標）**
 
-![推論失敗紀錄](/lerobot-so101-elevator/docs/assets/ACT_LC_InferenceFailed.mp4)
+  - **故障現象：**
+    手臂雖然接收到指令並開始動作，但動作路徑完全偏離目標，出現甩動或在空中亂舞的現象。典型的失敗錄像如下：
 
-**問題排查與潛在解決方案：**
-為了找出行為異常的原因，目前正針對以下幾點進行逐一排查：
+    ![推論失敗紀錄](/lerobot-so101-elevator/docs/assets/ACT_LC_InferenceFailed.mp4)
 
-1.  **色域標準一致性 (BGR vs RGB)**：
-    *   **可能原因**：OpenCV 預設讀取影像為 BGR，但多數神經網路（包含 LeRobot 錄製格式）預期為 RGB。色域顛倒會導致特徵提取完全錯誤。
-    *   **排查狀態**：待驗證。已在腳本中準備通道翻轉邏輯。
-2.  **指令字串精確度**：
-    *   **可能原因**：模型對文字非常敏感，非訓練集的指令（如多一個空格）可能導致特徵偏移。
-    *   **排查狀態**：待驗證。已修正提示訊息確保輸入格式一致。
-3.  **校正數據一致性**：
-    *   **可能原因**：若推論時與錄製時用的馬達校正檔不同，座標系會整體偏移。
-    *   **排查狀態**：已排除。透過固定 `robot_id` 確保套用正確校正。
-4.  **模型狀態 (Train/Eval Mode)**：
-    *   **可能原因**：若 BN 層未固定在 Eval 模式，推論結果會劇烈晃動。
-    *   **排查狀態**：已排除。已確認 `policy.eval()` 被調用。
+  - **問題排查與解決方案紀錄：**
+
+  1.  **[已排除] 色域標準一致性 (BGR vs RGB)**：
+       - **現象**：OpenCV 預設讀取影像為 BGR。
+       - **驗證結果**：已測試通道翻轉補丁，但亂舞現象依舊，判定色域非此階段主因。
+  2.  **[已解決] 指令字串精確度**：
+       - **原因**：模型對文字指令敏感。
+       - **修正**：已更新提示訊息並鎖定特徵注入字串，排除了輸入歧義。
+  3.  **[已解決] 模型文字導引功能缺失 (Deep Model Hotfix)**：
+       - **現象**：連續報錯 `AttributeError` 找不到 `text_encoder/tokenizer/pos_embed`。
+       - **原因**：受訓模型 `config.json` 缺少屬性，導致內建編碼組件未被載入。
+       - **修正**：在 `inference_language_act.py` 中實作外科手術式的補丁，強制注入組件，程式已能正常執行不報錯。
+  4.  **[已排除] 校正數據與模型狀態**：
+       - **狀態**：已確認固定 `robot_id` 並執行 `policy.eval()`。
+  5.  **[已解決] 影像層級報錯**：
+       - **現象**：`ByteTensor` 與 `FloatTensor` 不匹配。
+       - **原因**：未進行影像歸一化。
+       - **修正**：實作 `img.float() / 255.0`。
+  6.  **[已解決] 歸一化參數 (Stats) 缺失 (亂舞問題)**：
+       - **現象**：手臂行為如 `ACT_LC_InferenceFailed.mp4` 一樣出現亂舞與大幅反向偏移。
+       - **原因**：模型推論時 `stats.json` 未自動掛載，導致輸入網路的關節弧度沒有正規化到 `[-1, 1]` 區間，且網路輸出的 Action 亦沒有被反正規化還原，送到實體馬達造成極微小震盪與無序抽動。
+       - **修正**：在 `inference_language_act.py` 實作自動與 Hugging Face 同步 `stats.json` 並全域載入，補齊完整的 `(x - mean)/std` 與反推數學運算。
+
+  **第二階段：手臂能到面板但無法精準定位按鈕**
+
+    - **現狀描述**：經過第一階段修復後，推論引擎不再亂舞，順利完成任務執行而不報錯。然而實機出現新的異常行為：
+    - **故障錄像**：![推論失敗紀錄 2](/lerobot-so101-elevator/docs/assets/ACT_LC_InferenceFailed_2.mp4)
+    - **現狀敘述**：模型已經不亂甩了，而且會產生像是要前進按面板的平滑軌跡，但最終卻定位失敗，無法精準按壓到所下的文字指令（例如 `press button 3`）對應的目標按鈕。
+
+  - **第二階段問題排查方向：**
+
+  1. **[已排除] 相機視角/環境佈置差異 (Camera Calibration Drift)**：
+       - *原推測*：推論時的相機擺放位置、光線或面板的物理距離可能與錄製時產生了些微偏移。
+       - *驗證方法*：建立 `scripts/check_train_frames.py` 從訓練集中逐 Task 抽樣首幀並輸出 grid 圖；同時在 `inference_language_act.py` 加入 `--save_frame` 參數，在推論 Step 0 自動儲存實機首幀，兩者並排比對。
+       - *驗證結果*：
+          - **按鈕面板的位置與大小**：推論首幀與訓練集截圖幾乎重疊，面板在畫面左側的相對位置一致，遠近比例沒有明顯偏移。
+          - **背景螢幕內容**：訓練時畫面中央螢幕顯示深藍色 Terminal 畫面；推論時螢幕內容不同。此差異屬於背景雜訊，ACT 的 Spatial Attention 主要聚焦在目標物件上，判定非主因。
+     ![相機視角確認對比圖（左：推論首幀 / 右：訓練集截圖）](assets/ACT_LC_InferenceFailed_camera_clibration.png)
+       - *結論*：**相機視角正常，此項已排除**，不需要調整相機位置。
+  2. **多任務特徵崩潰/平均化 (Mode Collapse / Averaging)**：
+      - *推測*：模型可能在初期對文字特徵 (`language_instruction`) 關注度不足，導致網路看見面板影像時，由於不知道該選哪一顆按鈕，直接輸出了 6 顆按鈕軌跡的「平均路線」（例如一直往面板群體的正中央按過去）。
+      - *判斷*：從 `ACT_LC_InferenceFailed_2.mp4` 觀察，手臂的軌跡有明確方向感且平滑，並非毫無目標地往面板中央按。**目前優先度較低，若補錄後仍無改善再排查此項**。
+  3. **[已排除] 初始起始點訓練覆蓋不足 (Insufficient Coverage of Starting Pose)**：
+      - *推測*：ACT 模型對起始觀測值（影像 + 關節角度的組合）高度敏感。失敗行為呈現「軌跡平滑但落點不準」，更符合以下原因：在 50 個 Episode 中，與當前推論時完全相同的起始姿勢出現次數不足，導致模型只能「插值拼湊」而無法精確定位。
+      - *兩種可能面向*：
+          - **手臂姿勢偏移**：推論前手臂未回到錄製時相似的預備位置，導致起始觀測本身就已偏移。
+          - **訓練資料覆蓋不足**：即使姿勢正確，該起始點對應的 Episode 數量太少，模型對此起始狀態沒有足夠的動作軌跡可供參考。
+      - *行動計畫*：三個按鍵各補錄 20 個 Episode，確保更多樣的起始姿勢都有足夠的訓練覆蓋，補錄後重訓驗證：
+          - ***Step A：補錄資料（三個按鍵各補 20 個 → 共 70 個）***
+             為避免資料不均衡引入訓練偏差，三個按鍵須同步補錄，維持平衡分布：
+             ```bash
+             bash scripts/record_6btn.sh 1 20   # 按鍵 1 補錄 20 個 (接續既有 50 個)
+             bash scripts/record_6btn.sh 2 20   # 按鍵 2 補錄 20 個
+             bash scripts/record_6btn.sh 3 20   # 按鍵 3 補錄 20 個
+             ```
+             完成後用 `python scripts/check_dataset_balance.py` 確認三個 task 各為 70 個 Episode。
+          - ***Step B：資料集上傳雲端***：
+             ```bash
+             python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset; dataset = LeRobotDataset('RonLiao/lerobot-so101-elevator-6btn-multitask'); dataset.push_to_hub()"
+             ```
+          - ***Step C：重新訓練 (v2)***
+             ```bash
+             python scripts/train_act_lc.py \
+               --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-multitask" \
+               --policy.type="act" \
+               --batch_size=16 \
+               --eval_freq=10000 \
+               --save_freq=10000 \
+               --save_checkpoint=true \
+               --policy.push_to_hub=false \
+               --wandb.enable=true \
+               --wandb.project="lerobot-so101-elevator-lc" \
+               --output_dir="outputs/train/act_lc_btn_1_to_3_v2" \
+               --job_name="act_lc_btn_1_to_3_v2"
+             ```
+          - ***Step D：推論驗證***
+             重訓完成後，再次執行推論，但是仍然未改善：
+             - 故障錄像：![推論v2失敗紀錄 - 按鍵1](/lerobot-so101-elevator/docs/assets/          ACT_LC_InferenceFailed_v2_button1.mp4)
+             - 故障錄像：![推論v2失敗紀錄 - 按鍵2](/lerobot-so101-elevator/docs/assets/          ACT_LC_InferenceFailed_v2_button2.mp4)
+             - 故障錄像：![推論v2失敗紀錄 - 按鍵3](/lerobot-so101-elevator/docs/assets/          ACT_LC_InferenceFailed_v2_button3.mp4)
+  4. **[已修正] 多任務特徵崩潰 (Mode Collapse) — 實為 Language Model 不一致**：
+      - *影片分析結果*：透過比對三支故障影片（v2），確認三次推論（press button 1 / 2 / 3）的手臂落點幾乎完全相同，手  臂全部朝向面板中層同一按鈕位置，**確認為 Mode Collapse**。
+      - *根本原因*：影片終端機畫面中可見大量 `UNEXPECTED` 警告。追查後發現推論腳本 `inference_language_act.py` 的   Deep Model Hotfix 中，硬編碼了錯誤的語言模型名稱：`bert-base-uncased`，而訓練時 `configuration_act.py` 使用  的是 `distilbert-base-uncased`。Tokenizer 與 Text Encoder 完全不同，導致語言特徵對模型而言等同於**隨機雜訊  **，模型退化成純影像驅動，因而輸出訓練集中最常見的「平均軌跡」（恰好是 Button 3 的位置）。
+      - *修正*：已修正 `inference_language_act.py`，將 `language_model_name` 由 `"bert-base-uncased"` 改回與訓  練一致的 `"distilbert-base-uncased"`，並將 `max_text_length` 由 512 修正為 16（與 `configuration_act.py`   預設值一致）。**不需要重新訓練，直接用現有的 v2 模型重新推論即可驗證。**
+  5. **[已修正，驗證結果：部分改善但仍有定位問題] 推論腳本使用錯誤的 Language Model (inference_language_act.py   Bug)**：
+     - *問題描述*：推論模型路徑忘了改成新訓練的 `so101-elevator-act-lc-btn-1-to-3-v2`，加上 Hotfix 中的 Text   Encoder 型號也寫錯（`bert-base-uncased` 應為 `distilbert-base-uncased`）。
+     - *修正*：已修正 `inference_language_act.py` 的 `repo_id` 預設值及 `language_model_name`。
+     - *驗證結果*：修正後重新推論，**有明顯進步**：手臂已能碰觸到電梯面板，但落點位於 Button 2~3~4 交界的模糊中心  區，未能精確按到指定的 Button 3。
+     - 故障錄像（指令：press button 3，但仍按中間甚至誤觸 button 2）：![推論v2-distilbert-Test2 - 按鍵3](/  lerobot-so101-elevator/docs/assets/ACT_LC_InferenceFailed_v2_Test2_button3.mp4)
+     - *影片逐點驗證*：
+       1. **手臂實際接觸到面板**。約 0:14 秒首次成功碰觸，表示 distilbert 修正有效，語言條件已成功引導手臂移動至面  板區域。
+       2. **手臂瞄準 Button 2~3 之間**。儘管指令為 "press button 3"，接近面板後動作集中在 Button 2、3、4 交界的中  心區域，呈現「模糊的目標感」—知道要按按鈕，但無法從全景相機視野中精確辨識 Button 3 的具體邊界。這個現在在命令  為"press button 1"或"press button 2"也會發生，多次嘗試都試著按在1，2，3這三個按鈕的中間，偏Button 2的位  置。
+       3. **誤觸 Button 2**。約 0:39 秒 Button 2 指示燈明顯亮起（變為藍色），確認發生誤觸。
+       4. **其他手臂行為觀察**：
+          - **摸索行為（Searching Behavior）**：手臂在面板附近持續小範圍抖動摸索，而非果斷按下。這是模型輸出的動作  序列在空間特徵不明確時，在多個可能的按鈕位置間擺盪的典型表現。
+          - **導航成功，精度失敗**：從大尺度移動來看，手臂從起始位置準確降落在面板前方，說明「大方向」正確。目前的瓶  頸鎖定在「最後 5 公分」的精確定位，強力支持引入**手眼相機**以提供近距離高解析度特徵的必要性。
+  
+  6. **[已驗證] 全景相機視角限制，無法提供精確定位所需的視覺資訊**：
+     - *推測*：全景相機距離面板約 40-60cm，在 640×480 解析度下，三顆相鄰按鈕的橫向間距推估僅約 **15~30 像素**。  ResNet-18 在經過 stride=32 的 Spatial Pooling 後，此差距被壓縮至不到 1 個 feature 單位，模型幾乎無法從視覺上  區分 Button 1/2/3 的個別位置。
+     - *驗證方法與結果*：執行 `scripts/check_train_frames.py` 抽取三組任務的訓練集初始幀截圖（`outputs/  train_frames/front/grid_press_button_*.png`），直接目視分析：
+       - **按鈕像素間距實測**：整個 2×3 按鈕面板寬度約 100~120 像素，單顆按鈕寬約 35~40 像素，相鄰按鈕圓心間距約   **45~55 像素**。數字雖比原估計稍好，但問題並非單純的像素數，而是以下兩個發現：
+       - **⚠️ 關鍵發現一：三組任務的初始幀視覺上幾乎完全相同**。三張截圖的面板角度、背景、環境幾乎無法用肉眼區分，模  型要從幾乎相同的影像預測完全不同的目標動作，**幾乎完全依賴語言條件和關節角度（`observation.state`）**，而非  視覺差異。
+       - **⚠️ 關鍵發現二：初始幀中看不到手臂**。手臂在任務起始時位於畫面下方或後方，全景相機拍不到手臂的初始位置，導  致模型在推論開始時無法從影像中獲得空間參考。
+     - *結論*：全景相機能引導手臂「大方向」到達面板前，但缺乏「最後 5cm 精確定位」所需的即時近距離視覺反饋。**手眼相  機是最根本的解法**：手臂接近面板時，手眼視角能提供按鈕的高解析度特寫，使模型獲得清晰的目標位置資訊。
+     - *手眼相機（Eye-in-Hand Camera）的潛力*：目前僅使用左側全景相機（`front`），手腕下方的第二顆手眼相機尚未啟  用。手眼相機在手臂接近面板時，能獲得極高解析度的按鈕特寫影像，是解決精度瓶頸最根本的方案。
+       - **代價**：現有 v2 資料集完全沒有手眼相機的影像，無法直接在推論時加入。**必須重新錄製全套資料集（同時錄製雙  相機）並重訓**，才能讓模型學會利用手眼視角進行精確定位。
+     - *行動計畫*：
+       - **方案 A（不重錄，短期嘗試）**：將每個按鈕的資料量從 70 增加至 150 Episodes 並重訓，同時在推論時啟用   `temporal_ensemble_coeff=0.01`，用時序集成平滑輸出，看是否能在單全景相機條件下提升精度。
+       - **方案 B（重錄，根本解法）**：在錄製腳本中加入手眼相機（`wrist`），重新錄製雙相機多任務資料集，訓練含手眼視  角的新版模型（v3）。
+  
