@@ -3,3 +3,11 @@
 .env
 .draft/
 lerobot-so101-elevator/outputs/
+
+# Python bytecode
+**/__pycache__/
+**/*.pyc
+
+# HuggingFace Auto-downloaded cache files
+lerobot-so101-elevator/configs/stats.json
+lerobot-so101-elevator/tasks.parquet
