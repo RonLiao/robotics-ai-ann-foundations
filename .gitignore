@@ -10,4 +10,5 @@ lerobot-so101-elevator/outputs/
 
 # HuggingFace Auto-downloaded cache files
 lerobot-so101-elevator/configs/stats.json
+lerobot-so101-elevator/configs/stats_dualcam.json
 lerobot-so101-elevator/tasks.parquet
