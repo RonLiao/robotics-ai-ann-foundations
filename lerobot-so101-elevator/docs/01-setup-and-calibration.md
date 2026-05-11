@@ -111,6 +111,18 @@
      --robot.cameras="{front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}"
    ```
 
+   連動測試 (含雙相機)：
+   ```bash
+   lerobot-teleoperate \
+     --teleop.type=so101_leader \
+     --teleop.port=/dev/ttyACM0 \
+     --teleop.id=my_awesome_leader_arm \
+     --robot.type=so101_follower \
+     --robot.port=/dev/ttyACM1 \
+     --robot.id=my_awesome_follower_arm \
+     --robot.cameras="{front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}, wrist: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}}"
+   ```
+
 ## 2. 下一步工作
 
 在環境建置與連動測試成功後，由02-practice-circle-magnet.md記錄接續的項目：
