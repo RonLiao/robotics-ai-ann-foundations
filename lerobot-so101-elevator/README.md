@@ -76,6 +76,13 @@
     - 修正歸一化 (`stats.json`) 對齊問題，解決手臂亂舞問題。
     - 診斷並修正 Language Model 不一致問題（`bert` 誤用為 `distilbert`），確認 v2 模型語言條件已生效。
     - **[已確認瓶頸]** 全景相機視角在「最後 5cm」缺乏近距離視覺反饋，無法精確區分相鄰按鈕。
+  - **[進行中]** 第五步：手眼相機雙相機 v3 方案。
+    - **[已完成]** 確認手眼相機 device index（`/dev/video2`），建立雙相機錄製腳本 `scripts/record_6btn_dual_cam.sh`。
+    - **[已完成]** 建立新 Dataset Repo (`RonLiao/lerobot-so101-elevator-6btn-dual-cam`) 並重新錄製（各 50 Episodes）。
+    - **[已完成]** 訓練含手眼視角的 dualcam 模型，上傳至 `RonLiao/so101-elevator-act-lc-btn-1-to-3-dualcam`。
+    - **[已完成]** 新建 `scripts/inference_language_act_dualcam.py` 支援雙相機推論，Dummy 測試通過。
+    - **[進行中]** 實機推論部署除錯：3 顆按鈕均無法精準按壓，除錯中。
+    - **[待進行]** 完成其餘 3 顆按鈕 (按鈕 4~6) 的錄製（保留後續擴充）。
 
 ### 階段三：視覺-語言-動作大模型 (VLA) 實作
 - **目標**：邁步「層次三」的前沿技術，直接引入 VLA (Vision-Language-Action) 多模態大模型。將驗證它強大的網路常識與 Zero-shot 推論潛力，以自然語言端到端控制複雜影像的按壓行為。
@@ -89,3 +96,12 @@
 ### 持續性任務：框架解析與經驗累積
 - **目標**：隨著各階段模型的訓練實作，持續深入剖析與記錄 LeRobot 框架、HuggingFace 以及 WandB 的底層架構與進階工具鏈使用心得。
 - **紀錄文件**：[03-lerobot-framework-anatomy.md](docs/03-lerobot-framework-anatomy.md)
+- **學習進度**：
+  - **[已完成]** LeRobot 六大模組框架解析（scripts / policies / datasets / robot_devices / config / envs）
+  - **[已完成]** Hydra Config + Registry 機制：`--robot.type=so101_follower` 如何透過 Registry 查找並實例化對應驅動
+  - **[已完成]** ACT + SO-101 移植案例：確認 `train.py` / `record.py` 不需修改，移植工作完全在 policies / robot_devices 層完成
+  - **[已完成]** ACT-LC 客製化實作：`train_act_lc.py`（Monkey-patch）、`inference_language_act.py`（互動式推論 + 靜止偵測）
+  - **[已完成]** Dataset 層三大客製化點：`lerobot-record` 參數決定 features schema、`delta_timestamps` 決定時間窗口、`__getitem__` Wrapper 注入額外欄位（ACTLCDataset）
+  - **[已完成]** robot_devices 層架構：`robots/`（SO101Follower / SO101Leader）與 `cameras/`（OpenCV / RealSense）平行結構；`SO101Follower.capture_observation()` / `send_action()` vs `SO101Leader.get_action()` 的介面差異
+  - **[已完成]** `lerobot-record` 錄製模式的完整 Leader→Follower→Dataset 每幀資料流
+  - **[待進行]** Trace `lerobot-record` 指令的實際 script：從 `pyproject.toml` 入口出發，逐步追蹤 `record.py` 如何解析 `--robot.type` / `--teleop.type`、呼叫 `make_robot_from_config()`、進入 `robots/utils.py` Registry 查找，最終連結到 `so101_follower.py` / `so101_leader.py` 的實際實作

@@ -338,11 +338,11 @@ python scripts/inference_language_act.py --dummy
      - *驗證結果*：修正後重新推論，**有明顯進步**：手臂已能碰觸到電梯面板，但落點位於 Button 2~3~4 交界的模糊中心  區，未能精確按到指定的 Button 3。
      - 故障錄像（指令：press button 3，但仍按中間甚至誤觸 button 2）：![推論v2-distilbert-Test2 - 按鍵3](/  lerobot-so101-elevator/docs/assets/ACT_LC_InferenceFailed_v2_Test2_button3.mp4)
      - *影片逐點驗證*：
-       1. **手臂實際接觸到面板**。約 0:14 秒首次成功碰觸，表示 distilbert 修正有效，語言條件已成功引導手臂移動至面  板區域。
-       2. **手臂瞄準 Button 2~3 之間**。儘管指令為 "press button 3"，接近面板後動作集中在 Button 2、3、4 交界的中  心區域，呈現「模糊的目標感」—知道要按按鈕，但無法從全景相機視野中精確辨識 Button 3 的具體邊界。這個現在在命令  為"press button 1"或"press button 2"也會發生，多次嘗試都試著按在1，2，3這三個按鈕的中間，偏Button 2的位  置。
+       1. **手臂實際接觸到面板**。約 0:14 秒首次成功碰觸，表示 distilbert 修正有效，語言條件已成功引導手臂移動至面板區域。
+       2. **手臂瞄準 Button 2~3 之間**。儘管指令為 "press button 3"，接近面板後動作集中在 Button 2、3、4 交界的中心區域，呈現「模糊的目標感」—知道要按按鈕，但無法從全景相機視野中精確辨識 Button 3 的具體邊界。這個現在在命令為"press button 1"或"press button 2"也會發生，多次嘗試都試著按在1，2，3這三個按鈕的中間，偏Button 2的位置。
        3. **誤觸 Button 2**。約 0:39 秒 Button 2 指示燈明顯亮起（變為藍色），確認發生誤觸。
        4. **其他手臂行為觀察**：
-          - **摸索行為（Searching Behavior）**：手臂在面板附近持續小範圍抖動摸索，而非果斷按下。這是模型輸出的動作  序列在空間特徵不明確時，在多個可能的按鈕位置間擺盪的典型表現。
+          - **摸索行為（Searching Behavior）**：手臂在面板附近持續小範圍抖動摸索，而非果斷按下。這是模型輸出的動作序列在空間特徵不明確時，在多個可能的按鈕位置間擺盪的典型表現。
           - **導航成功，精度失敗**：從大尺度移動來看，手臂從起始位置準確降落在面板前方，說明「大方向」正確。目前的瓶  頸鎖定在「最後 5 公分」的精確定位，強力支持引入**手眼相機**以提供近距離高解析度特徵的必要性。
   
   6. **[已驗證] 全景相機視角限制，無法提供精確定位所需的視覺資訊**：
@@ -355,6 +355,154 @@ python scripts/inference_language_act.py --dummy
      - *手眼相機（Eye-in-Hand Camera）的潛力*：目前僅使用左側全景相機（`front`），手腕下方的第二顆手眼相機尚未啟  用。手眼相機在手臂接近面板時，能獲得極高解析度的按鈕特寫影像，是解決精度瓶頸最根本的方案。
        - **代價**：現有 v2 資料集完全沒有手眼相機的影像，無法直接在推論時加入。**必須重新錄製全套資料集（同時錄製雙  相機）並重訓**，才能讓模型學會利用手眼視角進行精確定位。
      - *行動計畫*：
-       - **方案 A（不重錄，短期嘗試）**：將每個按鈕的資料量從 70 增加至 150 Episodes 並重訓，同時在推論時啟用   `temporal_ensemble_coeff=0.01`，用時序集成平滑輸出，看是否能在單全景相機條件下提升精度。
+       - **方案 A（不重錄，短期嘗試）**：將每個按鈕的資料量從 70 增加至 150 Episodes 並重訓，同時在推論時啟用   `temporal_ensemble_coeff=0.01`, 用時序集成平滑輸出，看是否能在單全景相機條件下提升精度。
        - **方案 B（重錄，根本解法）**：在錄製腳本中加入手眼相機（`wrist`），重新錄製雙相機多任務資料集，訓練含手眼視  角的新版模型（v3）。
-  
+
+### 第五步：手眼相機雙相機 v3 方案 (Eye-in-Hand Camera)
+
+引入手眼相機（`wrist`）作為第二路視覺輸入，解決全景相機在「最後 5cm」精確定位的視覺盲區。
+
+- **方案決策**：放棄方案 A（僅增加資料量），採用**方案 B（根本解法）**：重新錄製雙相機資料集並重新訓練。
+  - **原因**：全景相機的視角限制是結構性問題，無法靠資料量補償；手眼相機能在接近面板時提供按鈕的高解析度特寫，是解決精度瓶頸的唯一根本方案。
+
+- **架構說明（雙相機 v3）**：
+  - `observation.images.front`：全景相機（既有），提供手臂大方向定位。
+  - `observation.images.wrist`：手眼相機（新增），提供接近面板時的近距離按鈕特寫。
+  - `modeling_act.py` 的 `for img in batch[OBS_IMAGES]` 迴圈已原生支援多相機，**不需要改動模型架構**。
+
+- **Step 0：硬體確認**
+
+  實體安裝手眼相機後，在容器內確認 device index：
+  ```bash
+  ls /dev/video*
+  ```
+  擷取單幀確認手眼相機畫面正確（確認後可刪除）：
+  ```bash
+  ffmpeg -y -f v4l2 -i /dev/video2 -frames:v 1 -update 1 /root/shared/robotics-ai-ann-foundations/lerobot-so101-elevator/wrist_check.jpg
+  ```
+  確認結果：手眼相機 device index 為 `/dev/video2`（`/dev/video0/1` 為前置相機，`/dev/video2/3` 為手眼相機）。
+
+- **Step 1：建立雙相機錄製腳本 (`scripts/record_6btn_dual_cam.sh`)**
+
+  保留原有的 `scripts/record_6btn.sh` 不動，新建 `scripts/record_6btn_dual_cam.sh`，加入 `wrist` 相機並指向新 Repo：
+  - `REPO_ID="RonLiao/lerobot-so101-elevator-6btn-dual-cam"`
+  - `--robot.cameras` 加入 `wrist: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}`
+
+- **Step 2：建立新 Dataset Repo**
+
+  ```bash
+  python -c "from huggingface_hub import HfApi; HfApi().create_repo(repo_id='RonLiao/lerobot-so101-elevator-6btn-dual-cam', repo_type='dataset', exist_ok=True)"
+  ```
+
+- **Step 3：重新錄製資料集（雙相機，各 50 Episodes）**
+
+  ```bash
+  # 按鍵 1 首次錄製（初始化新 Repo）
+  bash scripts/record_6btn_dual_cam.sh 1 1 false
+
+  # 按鍵 1 補錄剩餘 49 回合
+  bash scripts/record_6btn_dual_cam.sh 1 49
+
+  # 按鍵 2、3 各 50 回合
+  bash scripts/record_6btn_dual_cam.sh 2 50
+  bash scripts/record_6btn_dual_cam.sh 3 50
+  ```
+
+  完成後確認資料均衡：
+  ```bash
+  python scripts/check_dataset_balance_dual_cam.py
+  python scripts/check_train_frames.py --repo_id RonLiao/lerobot-so101-elevator-6btn-dual-cam
+  ```
+  `check_train_frames.py` 應輸出 `observation.images.front` 與 `observation.images.wrist` 兩組影格截圖，確認雙相機均有正常錄入。
+
+  確認無誤後，將本地資料集上傳至 Hugging Face：
+  ```bash
+  python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset; dataset = LeRobotDataset('RonLiao/lerobot-so101-elevator-6btn-dual-cam'); dataset.push_to_hub()"
+  ```
+  > [!NOTE]
+  > 上傳完成後，至 Hugging Face 頁面確認檔案大小與 `tasks.parquet` 中三個任務標籤均正確。
+
+- **經驗：初始位置多樣化策略（避免起始點覆蓋不足）**
+
+  v1/v2 訓練後期暴露出一個問題：所有 Episodes 的起始手臂姿勢過於集中，導致模型在推論時若起始位置略有偏差，就無法精確定位目標按鈕（參見第四步的「初始起始點訓練覆蓋不足」排查筆記）。
+
+  **v3 錄製策略（每按鍵 50 Episodes 的分配建議）：**
+  - **前 30 個 Episodes**：使用預設標準起始位置錄製，確保模型在最常見的初始狀態下有充足的訓練覆蓋。
+  - **中間 10 個 Episodes**：小幅更改起始位置（手臂微偏左/右/前/後約 2~5cm），讓模型學會從略有偏差的位置仍能正確導航。
+  - **最後 10 個 Episodes**：大幅更改起始位置（手臂明顯偏移或角度不同），強迫模型對更廣的起始狀態分布建立魯棒的動作規劃能力。
+
+  此策略可在不增加總錄製量的前提下，顯著提升模型對真實環境中起始位置擾動的容錯性。
+
+- **Step 4：訓練 雙相機 模型**
+
+  ```bash
+  python scripts/train_act_lc.py \
+    --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam" \
+    --policy.type="act" \
+    --batch_size=16 \
+    --eval_freq=10000 \
+    --save_freq=10000 \
+    --save_checkpoint=true \
+    --policy.push_to_hub=false \
+    --wandb.enable=true \
+    --wandb.project="lerobot-so101-elevator-lc-dualcam" \
+    --output_dir="outputs/train/act_lc_btn_1_to_3_dualcam" \
+    --job_name="act_lc_btn_1_to_3_dualcam"
+  ```
+
+  訓練完成後上傳：
+  ```bash
+  python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-lc-btn-1-to-3-dualcam'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_lc_btn_1_to_3_dualcam/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model')"
+  ```
+
+- **經驗：雙相機 訓練成果分析**
+   - **訓練日誌 (GitHub)**：[act_lc_train_20260508_201225.log](../record/act_lc_train_20260508_201225.log)
+
+   這是首度加入手眼相機（雙相機輸入）的多任務 Language-Conditioned 模型訓練。從記錄中解析出以下關鍵指標：
+
+  1. **訓練效能與時長**：
+     - **硬體**：NVIDIA GeForce GTX 1080 Ti (11GB VRAM)。
+     - **總耗時**：約 **16 小時 43 分鐘** (自 2026-05-08 20:12 啟動至隔日 12:55 結束)，**為 v1 單相機的兩倍**。
+     - **更新速率 (updt_s)**：單次 GPU 計算耗時穩定維持在 **0.563 秒**（v1 為 0.29 秒）。
+     - **資料載入延遲 (data_s)**：平均 **0.037 秒**（v1 為 0.019 秒）。
+     - **分析**：updt_s 與 data_s 幾乎恰好是 v1 的兩倍，完全符合「雙相機 = 兩倍影像 Token 運算量」的理論預期。ResNet-18 骨幹對每路相機獨立萃取特徵，Transformer Encoder 的序列長度也相應增長，因此計算時間線性擴增。I/O 方面 CPU/SSD 仍無瓶頸，四線程 DataLoader 能穩定供料。
+
+  2. **Loss 與收斂趨勢**：
+     - **誤差下降**：Loss 從初始的 **6.043** (step 200) 平穩下降，在約 step 20K 前快速收斂（0.2 以下），此後進入緩降平台期，最終收斂至 **0.041** (step 100K)。
+     - **梯度穩定度 (grdn)**：從起初的 **115.9** 持續降落，最終穩定在 **~3.5~3.8** 的區間內小幅震盪。
+     - **與 v1 比較**：v1 最終 loss 為 0.034、grdn 約 2.0；v3 最終 loss 略高（0.041），grdn 也稍高（3.5~3.8）。這是預期內的合理現象：雙相機帶來更複雜的視覺輸入，模型需對齊的特徵維度更多，Loss 地板略高屬正常，不代表訓練品質劣化。Loss 仍遠低於 0.1 的優良基準。
+     - **收斂判定**：約 step 70K~80K 後 Loss 與 grdn 均進入穩定平台，不再有顯著下降，代表模型在此資料量下已充分收斂。
+
+  3. **重要計步器參數解讀**：
+     - **`dataset.num_frames`**：36,104 幀（v1 的單相機資料集同樣 150 集但幀數更少），差異來自雙相機同步錄製使每幀含兩路影像，資料集體積翻倍。
+     - **`num_learnable_params`**：52M 參數（v1 相同），因為雙相機不增加模型參數數量，僅增加 Encoder 輸入序列長度。
+     - **`epch` (Epochs)**：在 10 萬步結束時約為 **44.23**，與 v1 的 44.28 幾乎相同，代表兩次訓練以相同節奏反覆研讀資料。
+
+- **Step 5：建立雙相機推論腳本 (`scripts/inference_language_act_dualcam.py`)**
+
+  保留原有的 `scripts/inference_language_act.py` 不動，新建 `scripts/inference_language_act_dualcam.py`。
+  與原腳本的差異：
+  - `--repo_id` 預設值改為 `RonLiao/so101-elevator-act-lc-btn-1-to-3-dualcam`
+  - 新增 `--front_camera_index`（預設 `0`）與 `--wrist_camera_index`（預設 `2`）參數
+  - `robot_cfg.cameras` 同時初始化 `front` 與 `wrist` 兩路相機
+  - 推論迴圈中同時處理 `observation.images.front` 與 `observation.images.wrist`
+  - Stats 從 `RonLiao/lerobot-so101-elevator-6btn-dual-cam` 讀取，本地快取為 `configs/stats_dualcam.json`（避免覆蓋舊版 `stats.json`）
+
+  驗證指令：
+  ```bash
+  # 先以 dummy 模式確認雙相機影像正常注入
+  python scripts/inference_language_act_dualcam.py --dummy
+
+  # 執行驗證輸出（三個按鈕均通過）
+  # 📊 Observation 鍵值: ['observation.images.front', 'observation.images.wrist', 'observation.state']
+  #    - observation.images.front: torch.Size([1, 3, 480, 640])
+  #    - observation.images.wrist: torch.Size([1, 3, 480, 640])
+  #    - observation.state: torch.Size([1, 6])
+  # ✅ 任務「press button 1」執行完畢
+  # ✅ 任務「press button 2」執行完畢
+  # ✅ 任務「press button 3」執行完畢
+
+  # 實機推論驗證（三個按鈕各測試一次）
+  python scripts/inference_language_act_dualcam.py
+  # 輸入: press button 1 / press button 2 / press button 3
+  ```
