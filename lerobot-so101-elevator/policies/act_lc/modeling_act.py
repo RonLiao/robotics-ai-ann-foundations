@@ -62,10 +62,10 @@ class ACTPolicy(PreTrainedPolicy):
         config.validate_features()
         self.config = config
 
-        # 初始化 Tokenizer
-        if hasattr(self.config, 'language_model_name'):
-            from transformers import AutoTokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(self.config.language_model_name, clean_up_tokenization_spaces=True)
+        # 初始化 Tokenizer（使用 getattr 確保原生 config 也能正常建立）
+        from transformers import AutoTokenizer
+        _lang_model = getattr(self.config, 'language_model_name', 'distilbert-base-uncased')
+        self.tokenizer = AutoTokenizer.from_pretrained(_lang_model, clean_up_tokenization_spaces=True)
 
         self.model = ACT(config)
 
@@ -140,7 +140,7 @@ class ACTPolicy(PreTrainedPolicy):
             batch[OBS_IMAGES] = [batch[key] for key in self.config.image_features]
 
         # 處理語言指令轉 Token
-        if hasattr(self.config, 'language_model_name') and "language_instruction" in batch:
+        if "language_instruction" in batch:
             device = batch[OBS_STATE].device if OBS_STATE in batch else next(self.parameters()).device
             text_inputs = self.tokenizer(
                 batch["language_instruction"],
@@ -162,7 +162,7 @@ class ACTPolicy(PreTrainedPolicy):
             batch[OBS_IMAGES] = [batch[key] for key in self.config.image_features]
 
         # 處理語言指令轉 Token
-        if hasattr(self.config, 'language_model_name') and "language_instruction" in batch:
+        if "language_instruction" in batch:
             device = batch[OBS_STATE].device if OBS_STATE in batch else next(self.parameters()).device
             text_inputs = self.tokenizer(
                 batch["language_instruction"],
@@ -428,12 +428,14 @@ class ACT(nn.Module):
             )
 
         # 文本特徵提取 (Language Backbone for ACT-LC)
-        if hasattr(self.config, 'language_model_name'):
-            from transformers import AutoModel
-            self.text_encoder = AutoModel.from_pretrained(self.config.language_model_name)
-            for param in self.text_encoder.parameters():
-                param.requires_grad = False
-            self.text_proj = nn.Linear(self.config.language_dim, config.dim_model)
+        # 使用 getattr 確保即使 config 來自原生 LeRobot ACTConfig 也能正確建立語言組件
+        _lang_model = getattr(self.config, 'language_model_name', 'distilbert-base-uncased')
+        _lang_dim = getattr(self.config, 'language_dim', 768)
+        from transformers import AutoModel
+        self.text_encoder = AutoModel.from_pretrained(_lang_model)
+        for param in self.text_encoder.parameters():
+            param.requires_grad = False
+        self.text_proj = nn.Linear(_lang_dim, config.dim_model)
 
         # --- 5. Transformer 編碼器位置編碼 ---
         # Transformer encoder positional embeddings.
@@ -450,8 +452,8 @@ class ACT(nn.Module):
         if self.config.image_features:
             self.encoder_cam_feat_pos_embed = ACTSinusoidalPositionEmbedding2d(config.dim_model // 2)
 
-        if hasattr(self.config, 'language_model_name'):
-            self.encoder_text_feat_pos_embed = nn.Embedding(self.config.max_text_length, config.dim_model)
+        _max_text_len = getattr(self.config, 'max_text_length', 16)
+        self.encoder_text_feat_pos_embed = nn.Embedding(_max_text_len, config.dim_model)
 
         # --- 6. Transformer 解碼器部分 ---
         # Transformer decoder.

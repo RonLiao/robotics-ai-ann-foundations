@@ -66,6 +66,18 @@ try:
     policy_factory.ACTPolicy = CustomACTPolicy
     act_modeling.ACTPolicy = CustomACTPolicy
     print("✅ 成功應用 Monkey-patch: CustomACTPolicy (Language-Conditioned) 已替換原生 ACTPolicy")
+
+    # 同時替換 ACTConfig，確保 language_model_name 等欄位隨訓練 config 一起載入
+    try:
+        try:
+            import lerobot.policies.act.configuration_act as act_config_module
+        except ImportError:
+            import lerobot.common.policies.act.configuration_act as act_config_module
+        from policies.act_lc.configuration_act import ACTConfig as CustomACTConfig
+        act_config_module.ACTConfig = CustomACTConfig
+        print("✅ 成功應用 Monkey-patch: CustomACTConfig (Language-Conditioned) 已替換原生 ACTConfig")
+    except Exception as _e:
+        print(f"⚠️ 替換 ACTConfig 時發生錯誤: {_e}")
 except Exception as e:
     print(f"⚠️ 替換 ACTPolicy 時發生錯誤，請確認路徑或導入是否正確: {e}")
 

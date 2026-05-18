@@ -48,6 +48,8 @@ def main():
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--dummy", action="store_true", help="不連接實體手臂，使用隨機資料測試")
     parser.add_argument("--save_frame", type=str, default="outputs/train_frames/inference_dualcam_frame.png")
+    parser.add_argument("--text_scale", type=float, default=1.0,
+                        help="text_proj 輸出縮放係數（>1 放大語言信號，用於驗證語言強度是否為 Mode Collapse 根本原因）")
 
     args = parser.parse_args()
 
@@ -80,10 +82,36 @@ def main():
                 param.requires_grad = False
             policy.model.text_proj = torch.nn.Linear(policy.config.language_dim, policy.model.config.dim_model).to(args.device)
             policy.model.encoder_text_feat_pos_embed = torch.nn.Embedding(policy.config.max_text_length, policy.model.config.dim_model).to(args.device)
+
+            # 【📍 關鍵修正】補載訓練好的 text_proj / encoder_text_feat_pos_embed 權重
+            # from_pretrained 時這兩層不存在於 __init__ 故被跳過，需手動從 checkpoint 補回
+            try:
+                from huggingface_hub import hf_hub_download
+                from safetensors.torch import load_file
+                ckpt_path = hf_hub_download(repo_id=args.repo_id, filename="model.safetensors")
+                ckpt = load_file(ckpt_path, device=args.device)
+                proj_keys = {k: v for k, v in ckpt.items() if "text_proj" in k or "encoder_text_feat_pos_embed" in k}
+                if proj_keys:
+                    # 去掉 "model." 前綴以對齊 policy.model 的 state_dict 鍵值
+                    remapped = {k.removeprefix("model."): v for k, v in proj_keys.items()}
+                    missing, unexpected = policy.model.load_state_dict(remapped, strict=False)
+                    print(f"✅ text_proj / pos_embed 訓練權重補載成功 ({len(proj_keys)} 個張量)")
+                else:
+                    print("⚠️ checkpoint 中找不到 text_proj 權重，語言條件可能失效！")
+            except Exception as _e:
+                print(f"⚠️ 補載 text_proj 權重失敗: {_e}")
+
             print("✅ 內部組件與位置編碼初始化成功！")
 
     policy.eval()
     policy.to(args.device)
+
+    if args.text_scale != 1.0:
+        def _text_scale_hook(module, input, output):
+            return output * args.text_scale
+        policy.model.text_proj.register_forward_hook(_text_scale_hook)
+        print(f"🔬 語言信號縮放係數: ×{args.text_scale}（text_proj 輸出已放大）")
+
     print("✅ 模型載入與初始化完畢！")
 
     # ==========================
@@ -123,6 +151,10 @@ def main():
                     for k, v in raw_stats.items()
                 }
                 print("🔧 成功全域載入歸一化 Stats！")
+                if "observation.state" in global_stats_to_use:
+                    s = global_stats_to_use["observation.state"]
+                    print(f"📊 Stats 驗證 - state mean: {s['mean'].tolist()}")
+                    print(f"📊 Stats 驗證 - state std:  {s['std'].tolist()}")
             except Exception as e:
                 print(f"⚠️ 讀取本機 Stats 失敗: {e}")
 
@@ -205,17 +237,19 @@ def main():
                         if cam_key in raw_obs:
                             observation[f"observation.images.{cam_key}"] = process_image(raw_obs[cam_key], args.device)
 
-                            # 儲存首幀供視角比對
-                            if s == 0 and args.save_frame and cam_key == "front":
+                            # 儲存首幀供視角比對 (front + wrist 各存一張)
+                            if s == 0 and args.save_frame:
                                 try:
                                     from PIL import Image as PilImage
-                                    img_t = observation["observation.images.front"].squeeze(0).clamp(0, 1)
+                                    img_t = observation[f"observation.images.{cam_key}"].squeeze(0).clamp(0, 1)
                                     pil_img = PilImage.fromarray((img_t.permute(1, 2, 0).cpu().numpy() * 255).astype("uint8"))
-                                    os.makedirs(os.path.dirname(os.path.abspath(args.save_frame)), exist_ok=True)
-                                    pil_img.save(args.save_frame)
-                                    print(f"📸 推論首幀 (front) 已儲存: {args.save_frame}")
+                                    base, ext = os.path.splitext(args.save_frame)
+                                    save_path = f"{base}_{cam_key}{ext}"
+                                    os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+                                    pil_img.save(save_path)
+                                    print(f"📸 推論首幀 ({cam_key}) 已儲存: {save_path}")
                                 except Exception as _e:
-                                    print(f"⚠️ 儲存首幀失敗: {_e}")
+                                    print(f"⚠️ 儲存首幀失敗 ({cam_key}): {_e}")
 
                     # 2. 關節狀態
                     joint_names = [
