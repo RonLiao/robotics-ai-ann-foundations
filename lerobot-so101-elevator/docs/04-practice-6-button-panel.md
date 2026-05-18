@@ -475,7 +475,8 @@ python scripts/inference_language_act.py --dummy
 
   3. **重要計步器參數解讀**：
      - **`dataset.num_frames`**：36,104 幀（v1 的單相機資料集同樣 150 集但幀數更少），差異來自雙相機同步錄製使每幀含兩路影像，資料集體積翻倍。
-     - **`num_learnable_params`**：52M 參數（v1 相同），因為雙相機不增加模型參數數量，僅增加 Encoder 輸入序列長度。
+     - **`num_learnable_params` / Keys**：訓練日誌顯示 **52M 參數**，checkpoint 共 **234 個具名權重張量（Keys）**。
+       - 這裡「Keys」指 `model.safetensors` 字典中有幾個具名矩陣（如 `model.backbone.conv1.weight` 算 1 個 key，但內含上千個數值）；「52M 參數」是把所有 key 的純量值加總。兩者是不同維度的計量。
      - **`epch` (Epochs)**：在 10 萬步結束時約為 **44.23**，與 v1 的 44.28 幾乎相同，代表兩次訓練以相同節奏反覆研讀資料。
 
 - **Step 5：建立雙相機推論腳本 (`scripts/inference_language_act_dualcam.py`)**
@@ -506,3 +507,758 @@ python scripts/inference_language_act.py --dummy
   python scripts/inference_language_act_dualcam.py
   # 輸入: press button 1 / press button 2 / press button 3
   ```
+
+- **Step 6：實機推論除錯 (v3 dualcam)**
+
+  **已知問題**：實機部署後，3 個按鈕指令均無法精準按壓目標按鈕。
+
+  **排查切入點：**
+
+  1. **[已排除] 相機視角對齊（錄製 vs 推論首幀比較）**：
+     - 驗證方法：
+       - 從訓練集抽樣雙相機首幀（`front` + `wrist`）：
+         ```bash
+         python scripts/check_train_frames.py \
+           --repo_id RonLiao/lerobot-so101-elevator-6btn-dual-cam \
+           --out_dir outputs/train_frames_dualcam
+         ```
+       - 推論時儲存首幀（兩路相機各存一張）：
+         ```bash
+         python scripts/inference_language_act_dualcam.py --save_frame outputs/inference_frame_dualcam.png
+         # 自動存出 outputs/inference_frame_dualcam_front.png
+         # 自動存出 outputs/inference_frame_dualcam_wrist.png
+         ```
+     - 驗證結果：推論首幀與訓練集截圖高度吻合，面板位置、距離與手眼視角均無明顯偏移。
+       ![雙相機視角確認對比圖（左：推論首幀 / 右：訓練集截圖）](assets/ACT_LC_InferenceFailed_dualcamera_clibration.png)
+     - *結論*：**front 與 wrist 視角均正常，此項已排除**。
+
+  2. **[已排除] Stats 歸一化對齊**：
+     - 驗證方法：`--dummy` 模式加入 `📊 Stats 驗證` 印出，直接觀察數值是否合理。
+     - 驗證結果：
+       ```
+       📊 Stats 驗證 - state mean: [27.58, -62.35, 42.71, -0.23, 0.94, 1.24]
+       📊 Stats 驗證 - state std:  [18.96, 34.80, 51.33, 58.57, 15.78, 0.041]
+       ```
+       數值非全零、非單位向量，`stats_dualcam.json` 已正確從 dualcam dataset 載入，**此項已排除**。
+
+  3. **[已確認根本原因 → 已修正，重訓完成] Checkpoint 中 `text_proj` 權重遺失（語言條件從未啟用）**：
+     - 問題現象：Dummy 測試出現 `⚠️ checkpoint 中找不到 text_proj 權重`；v3 dualcam checkpoint 總計僅 234 個 key，DistilBERT 本身就有 ~250 個參數 tensor，代表 `text_encoder`、`text_proj`、`encoder_text_feat_pos_embed` 從未被存入 checkpoint。
+     - **根本原因（Monkey-patch 只換了 Policy 類別，沒換 Config 類別）**：
+       - 訓練指令使用 `--policy.type="act"`，LeRobot 框架以此 key 從自身的 Config Registry 查找並實例化的是**原生 `ACTConfig`**，而非我們在 `configuration_act.py` 中定義的 `ACTConfig`（後者以 `act_lc` 為 key 註冊）。
+       - `train_act_lc.py` 的 Monkey-patch 只替換了 `ACTPolicy` 類別的指標，`ACTConfig` 的指標未被替換，因此訓練時的 config 物件不含 `language_model_name`、`language_dim`、`max_text_length` 等欄位。
+       - `ACT.__init__` 與 `ACTPolicy.__init__` 中以 `if hasattr(self.config, 'language_model_name')` 作為守衛，config 缺少此屬性時整個語言組件分支被**靜默跳過**，`text_encoder`、`text_proj`、`encoder_text_feat_pos_embed` 均未被建立。
+       - 結果：模型以**純 ACT（無語言條件）**完成 100K 步訓練，Loss 雖收斂至 0.041，但語言輸入對模型完全無效，三個按鈕指令輸出相同軌跡，即 **Mode Collapse**。
+     - 診斷指令（確認 checkpoint 實際含有哪些 key）：
+       ```bash
+       python -c "from safetensors.torch import load_file; ckpt = load_file('outputs/train/act_lc_btn_1_to_3_dualcam/checkpoints/last/pretrained_model/model.safetensors'); print([k for k in ckpt.keys() if 'text' in k or 'lang' in k]); print('total:', len(ckpt))"
+       ```
+       - 驗證結果：本地 checkpoint 也只有 234 個 key，找不到任何 `text_proj` / `text_encoder` key，確認語言組件從未被訓練。
+     - **修正方案（兩處並行修改）**：
+       1. **`train_act_lc.py`**：在替換 `ACTPolicy` 後，同步替換 `lerobot.policies.act.configuration_act.ACTConfig`，確保訓練框架使用含語言欄位的自定義 Config：
+          ```python
+          import lerobot.policies.act.configuration_act as act_config_module
+          from policies.act_lc.configuration_act import ACTConfig as CustomACTConfig
+          act_config_module.ACTConfig = CustomACTConfig
+          ```
+       2. **`policies/act_lc/modeling_act.py`**：將 `if hasattr(self.config, 'language_model_name')` 全部改為 `getattr(self.config, 'language_model_name', 'distilbert-base-uncased')` 形式，讓語言組件**無論 config 來源為何都強制建立**，杜絕靜默跳過的可能。
+     - 修正驗證指令：
+       ```bash
+       python -c "import sys; sys.path.insert(0,'.'); from policies.act_lc.modeling_act import ACT; import inspect; src = inspect.getsource(ACT.__init__); print('OK' if 'self.text_proj' in src and 'hasattr' not in src else 'FAIL')"
+       ```
+       - 驗證結果：`OK`，修正已確認生效。
+     - **當前狀態**：以修正後的訓練腳本重新執行 100K 步訓練（`outputs/train/act_lc_btn_1_to_3_dualcam_v2`），**訓練完成**，成果分析見下方「雙相機 v2 訓練成果分析」。
+
+- **經驗：雙相機 v2 (Language-Conditioned 修正版) 訓練成果分析**
+   - **訓練日誌**：[act_lc_train_20260511_152008.log](../record/act_lc_train_20260511_152008.log)
+
+   此次為**確認語言條件修正生效**後的重訓。相同資料集（150 集雙相機），訓練步數 100K，核心差異在於 ACTConfig Monkey-patch 已修正、DistilBERT 語言編碼器真正參與訓練。
+
+  1. **Monkey-patch 修正確認**：
+     - 訓練啟動時 Log 出現第三行確認訊息：`✅ 成功應用 Monkey-patch: CustomACTConfig (Language-Conditioned) 已替換原生 ACTConfig`，前兩版（v3 bug）均無此訊息。
+     - DistilBERT 模型載入 HTTP 請求於啟動時出現（`distilbert-base-uncased`），確認語言編碼器已被實例化。
+
+  2. **訓練效能與時長**：
+     - **總耗時**：約 **16 小時 43 分鐘**（2026-05-11 15:20 啟動至 2026-05-12 08:03 結束），與 v3 bug 版本相同。
+     - **更新速率 (updt_s)**：穩定維持 **0.563 秒**；DistilBERT 凍結後僅做前向推論，對短文字序列（≤16 token）的 GPU 計算量極小，未造成額外延遲。
+     - **資料載入延遲 (data_s)**：平均 **0.038 秒**，與前版一致。
+
+  3. **關鍵參數（語言條件確認指標）**：
+     - **`num_learnable_params`**：**52M** — 可訓練參數與 bug 版本相同（DistilBERT 已凍結，不計入）。
+     - **`num_total_params`**：**118M** — 與 bug 版本（52M total）的差值為 **66M**，即 DistilBERT 的全部參數。**此數字是語言條件生效的最直接佐證**：bug 版本 52M total = 模型中根本沒有 DistilBERT；修正版 118M total = DistilBERT 已被建立並存入模型。
+     - **Checkpoint key 數（預期）**：應可在 `model.safetensors` 中找到 `text_proj.weight`、`text_proj.bias`、`encoder_text_feat_pos_embed.weight` 等 key。驗證指令：
+       ```bash
+       python -c "from safetensors.torch import load_file; ckpt = load_file('outputs/train/act_lc_btn_1_to_3_dualcam_v2/checkpoints/last/pretrained_model/model.safetensors'); tp = [k for k in ckpt if 'text_proj' in k or 'encoder_text_feat_pos_embed' in k]; print(tp)"
+       ```
+
+  4. **Loss 與收斂趨勢**：
+     - **誤差下降**：Loss 從初始 **6.048**（step 200）平穩收斂，step 10K 降至 **0.178**，step 30K 降至 **0.083**，最終收斂至 **0.042**（step 100K）。
+     - **梯度穩定度 (grdn)**：從初始 **117.7** 持續降落，最終穩定於 **~3.9**。
+     - **與 v3 bug 版比較**：最終 Loss 0.042 略高於 bug 版 0.041，此為預期現象——語言條件生效後模型必須區分三種不同指令的動作分布，訓練 Loss 地板略高，反而表示模型沒有 Mode Collapse。
+
+  | 指標 | v3 bug（無 LC） | v2 fixed（有 LC） |
+  |------|:---:|:---:|
+  | `num_total_params` | 52M | **118M** |
+  | `num_learnable_params` | 52M | 52M |
+  | DistilBERT 在模型中 | ❌ 無 | ✅ 有 |
+  | 最終 Loss (100K) | 0.041 | 0.042 |
+  | Checkpoint `text_proj` | ❌ 無 | ✅ 已確認（見下方驗證結果） |
+  | 語言條件是否生效 | ❌ Mode Collapse | ✅ 生效（待實機驗證） |
+
+  **Checkpoint key 驗證結果**：
+  ```
+  ['model.encoder_text_feat_pos_embed.weight', 'model.text_proj.bias', 'model.text_proj.weight']
+  ```
+  三個語言條件組件 key 全部存在，確認語言條件已正確訓練並儲存至 checkpoint。
+
+- **Step 7：實機推論部署與結果分析（v2 fixed）**
+
+  推論腳本 `inference_language_act_dualcam.py` 直接 `import` 自定義的 `ACTPolicy`（不走 monkey-patch），可用 `--repo_id` 指向本機 checkpoint。
+
+  **上傳至 Hugging Face**
+  ```bash
+  python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-lc-btn-1-to-3-dualcam-v2'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_lc_btn_1_to_3_dualcam_v2/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model')"
+  ```
+
+  **推論指令**
+  ```bash
+  # Dummy 測試（不接手臂）
+  python scripts/inference_language_act_dualcam.py \
+    --repo_id outputs/train/act_lc_btn_1_to_3_dualcam_v2/checkpoints/last/pretrained_model \
+    --dummy
+
+  # 實機推論
+  python scripts/inference_language_act_dualcam.py \
+    --repo_id outputs/train/act_lc_btn_1_to_3_dualcam_v2/checkpoints/last/pretrained_model
+  python scripts/inference_language_act_dualcam.py \
+    --repo_id RonLiao/so101-elevator-act-lc-btn-1-to-3-dualcam-v2 
+  ```
+
+  **注意**：`--repo_id` 必須填完整路徑（`pretrained_model` 結尾），若打錯字 LeRobot 會把路徑當 HF repo ID 解析並報 `HFValidationError`。
+
+  **Dummy 測試結果（語言條件驗證）**
+
+  分別輸入 `press button 1` 與 `press button 2`，比較各 Step 的動作位移量：
+
+  | Step | press button 1 | press button 2 |
+  |:----:|:--------------:|:--------------:|
+  | 50   | 2.17           | 2.16           |
+  | 100  | **11.95**      | **38.70**      |
+  | 150  | 1.86           | 1.26           |
+
+  Step 100 位移量差達三倍以上，**確認語言條件在推論管線中有效**：不同指令確實產生了不同的動作軌跡。
+
+  同時觀察到 `🔧 Config 修復` 訊息出現，代表 `config.json` 沒有儲存 `language_model_name`（Hydra config 系統不受 Python 層 Monkey-patch 影響，只存原生 ACTConfig 欄位）。此情況**不影響推論正確性**：`modeling_act.py` 的 `getattr` 預設值確保 `text_proj` 等組件被建立，`from_pretrained` 再從 checkpoint 載入已驗證的訓練權重。
+
+  **實機推論結果**
+
+  ![實機推論失敗：三個指令均按同一位置](assets/ACT_LC_InferenceFailed_dualcamera_v2_alwayspresssameplace.png)
+
+  無論輸入 `press button 1 / 2 / 3`，手臂均落在圖中紅圈處（按鍵 1 與 3 之間偏右），三個指令的實體落點完全相同 → **Mode Collapse 仍存在**。
+
+  **根本原因分析**
+
+  Dummy 測試與實機推論的結果對比揭示了問題本質：
+
+  - **Dummy 模式**（視覺輸入 = 隨機雜訊）：模型唯一可用的資訊只有語言指令 → 語言差異被放大，不同指令產生顯著不同的動作。
+  - **實機模式**（視覺輸入 = 真實面板影像）：三顆按鈕的視覺特徵幾乎完全相同（前一步已確認），強烈的視覺信號主導模型輸出，語言信號強度不足以克服視覺相似性 → 模型輸出向空間均值坍塌。
+
+  語言條件**技術上已生效**（text_proj 訓練完成、推論管線正確傳遞）；問題在於**語言信號的有效強度不足以在此資料量與訓練步數下學到可靠的語言-動作對應**。
+
+  **待解決：下一步方向**
+
+  | 優先 | 方案 | 說明 |
+  |:----:|------|------|
+  | ⭐ 高 | 補錄至每顆按鈕 100 Episodes | 更多樣本讓語言梯度更充分學習語言-動作對應 |
+  | ⭐ 高 | 訓練延長至 200K 步 | 語言條件的跨模態對齊比純視覺收斂慢：v2 fixed 在 step 70K~80K 後 grdn 仍維持 ~3.9 小幅震盪（v1 純視覺同樣步數已降至 ~2.0），text_proj 與 Encoder Attention 的語言-動作對應尚未固化；200K 步給跨模態梯度足夠時間完成收斂 |
+  | 中 | 降低 `kl_weight`（10.0 → 2.0~5.0）| 減少 VAE KL 主導比例，語言梯度相對更強 |
+  | 低 | 換 FiLM / Cross-Attention 語言條件 | 架構層面更直接的語言控制，工程量較大 |
+
+### Step 8：補錄資料集 v3 (每按鈕 100 Episodes) 並重訓 200K 步
+
+針對 Mode Collapse 的根本解法：強化樣本密度，延長訓練步數，讓語言梯度有足夠的時間在更豐富的資料上建立語言-動作對應。
+
+**補錄策略**：新的 50 集全部由預設標準位置錄製，以強化最常見起始點的樣本密度（v2 fixed 的 50 集已涵蓋多樣起始點，新增 50 集集中標準位置可加深模型對最常見場景的確信度）。
+
+**補錄後資料集狀態**：
+- Dataset：`RonLiao/lerobot-so101-elevator-6btn-dual-cam`
+- 每顆按鈕：**100 Episodes**（原 50 + 補錄 50）
+- 總計：**300 Episodes**
+
+**Step 8-A：補錄指令**
+
+```bash
+# 各按鍵補錄 50 個 Episode（接續既有 50 個，維持平衡）
+bash scripts/record_6btn_dual_cam.sh 1 50
+bash scripts/record_6btn_dual_cam.sh 2 50
+bash scripts/record_6btn_dual_cam.sh 3 50
+```
+
+完成後確認資料均衡：
+```bash
+python scripts/check_dataset_balance_dual_cam.py
+```
+
+**Step 8-B：上傳資料集至 Hugging Face**
+
+```bash
+python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset; dataset = LeRobotDataset('RonLiao/lerobot-so101-elevator-6btn-dual-cam'); dataset.push_to_hub()"
+```
+
+**Step 8-C：啟動 v3 重訓（200K 步）**
+
+```bash
+python scripts/train_act_lc.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam" \
+  --policy.type="act" \
+  --batch_size=16 \
+  --steps=200000 \
+  --eval_freq=10000 \
+  --save_freq=10000 \
+  --save_checkpoint=true \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-lc-dualcam" \
+  --output_dir="outputs/train/act_lc_btn_1_to_3_dualcam_v3" \
+  --job_name="act_lc_btn_1_to_3_dualcam_v3"
+```
+
+> [!NOTE]
+> 與 v2 fixed 的差異：`--steps=200000`（加倍）、`--output_dir` 與 `--job_name` 後綴改為 `_v3`（避免覆蓋 v2 checkpoint，並在 WandB 中區隔兩次訓練曲線）。
+
+- **經驗：v3（300 Episodes × 200K 步）訓練成果分析**
+   - **訓練日誌**：[act_lc_train_20260512_154101.log](../record/act_lc_train_20260512_154101.log)
+
+   此次為針對 Mode Collapse 的強化重訓：資料集從 150 增至 300 Episodes（每按鍵 100 集），訓練步數從 100K 延長至 200K。
+
+  1. **Monkey-patch 確認（三行 ✅）**：
+     - 訓練啟動 Log 同樣出現三行 Monkey-patch 確認訊息（ACTLCDataset、CustomACTPolicy、CustomACTConfig），DistilBERT HTTP 請求於啟動時出現，語言條件確認生效。
+     - `num_total_params=118M`（DistilBERT 存在）、`num_learnable_params=52M`（凍結），與 v2 fixed 一致。
+
+  2. **訓練效能與時長**：
+     - **總耗時**：約 **33 小時 25 分鐘**（2026-05-12 15:41 啟動至 2026-05-14 01:05 結束）——恰好是 v2 fixed（16h43m）的 **兩倍**，與「steps × 2」的線性預期完全吻合。
+     - **更新速率 (updt_s)**：穩定 **0.563 秒**（與 v2 相同，架構未改動）。
+     - **資料載入延遲 (data_s)**：平均 **0.037~0.038 秒**（與 v2 相同，DataLoader 無瓶頸）。
+     - **`dataset.num_frames`**：**72,248**（v2 的 36,104 的兩倍，300 集 × 每集平均幀數）。
+
+  3. **Loss 與收斂趨勢**：
+
+     | Step | Loss | grdn | 備註 |
+     |:----:|:----:|:----:|------|
+     | 200 | 6.131 | 118.9 | 初始 |
+     | 20K | 0.119 | ~8.0 | 快速下降期 |
+     | 50K | 0.074 | 5.0 | |
+     | 100K | 0.049 | 3.5 | **v2 fixed 在此已停（0.042 / 3.9）** |
+     | 150K | 0.039 | 2.7 | |
+     | **200K** | **0.034** | **~2.4** | 最終收斂 |
+
+     - **全程持續收斂**：v2 fixed 在 step 70K~80K 後進入震盪平台（grdn 維持 ~3.9）；v3 在 100K 時仍在持續改善，直至 200K 才趨於穩定，**驗證了延長訓練步數的必要性**。
+     - **grdn 降至 ~2.4**：這是本專案各版本中最低的 grdn，已接近 v1 純視覺單任務的水準（grdn ~2.0），代表語言-動作對應的優化已充分穩定，不再有大幅震盪。
+     - **與 v2 fixed 比較**：v3 在 100K 步時 loss 仍為 0.049（略高於 v2 final 的 0.042），原因是 300 集的資料分布更多樣，每個 batch 的語言區辨難度更高；但訓練至 200K 後 loss 降至 0.034，**最終比 v2 fixed 低 19%**，grdn 也從 3.9 降至 2.4（改善 38%）。
+
+  4. **Epoch 數解讀**：
+     - **`epch` at 200K**：約 **44.25**——與 v2 fixed 在 100K 時的 44.23 **幾乎完全相同**。
+     - 此現象揭示了 v3 與 v2 的本質差異：兩者的 epoch 數完全相同，模型「看資料的次數」一樣多；但 v3 的每一 epoch 含有 **2 倍多樣的 Episodes**，且有 **2 倍的優化步數**讓梯度充分收斂。收斂改善來自「更豐富的語言-動作對應樣本」與「更多的跨模態梯度更新」，而非單純增加重複觀看次數。
+
+  | 指標 | v2 fixed（150 eps / 100K） | v3（300 eps / 200K） |
+  |------|:---:|:---:|
+  | `num_total_params` | 118M | 118M |
+  | `dataset.num_frames` | 36,104 | **72,248** |
+  | 最終 Loss | 0.042 | **0.034** |
+  | 最終 grdn | ~3.9 | **~2.4** |
+  | 訓練耗時 | 16h43m | 33h25m |
+  | Epochs | 44.23 | 44.25 |
+  | 語言條件 | ✅ 生效 | ✅ 生效 |
+
+**Step 8-D：上傳 v3 模型至 Hugging Face**
+
+```bash
+python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-lc-btn-1-to-3-dualcam-v3'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_lc_btn_1_to_3_dualcam_v3/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model')"
+```
+
+**Step 8-E：實機推論驗證**
+
+```bash
+# Dummy 測試（不接手臂）
+python scripts/inference_language_act_dualcam.py \
+  --repo_id outputs/train/act_lc_btn_1_to_3_dualcam_v3/checkpoints/last/pretrained_model \
+  --dummy
+
+# 實機推論
+python scripts/inference_language_act_dualcam.py \
+  --repo_id outputs/train/act_lc_btn_1_to_3_dualcam_v3/checkpoints/last/pretrained_model
+```
+
+**Dummy 測試結果（v3）**
+
+分別輸入 `press button 1 / 2 / 3`，比較 Step 100 的動作位移量：
+
+| Step | press button 1 | press button 2 | press button 3 |
+|:----:|:--------------:|:--------------:|:--------------:|
+| 50   | 0.83           | 1.43           | 0.92           |
+| 100  | **55.88**      | **38.66**      | **64.75**      |
+| 150  | 0.62           | 0.83           | 1.25           |
+
+**三顆按鈕位移量均有顯著差異，語言條件區辨能力大幅強化。**
+
+與 v2 fixed dummy 測試對比（v2 僅測 button 1 / 2）：
+
+| 指令 | v2 fixed Step 100 | v3 Step 100 | 倍率 |
+|------|:-----------------:|:-----------:|:----:|
+| press button 1 | 11.95 | **55.88** | **4.7×** |
+| press button 2 | 38.70 | **38.66** | ~1× |
+| press button 3 | — | **64.75** | — |
+
+- **Button 1 語言梯度大幅強化**：從 11.95 跳升至 55.88（4.7 倍），代表 v3 對 button 1 的語言-動作對應學習遠比 v2 更確信。
+- **Button 2 維持穩定**：38.70 → 38.66，未退化。
+- **三顆按鈕各異**：55.88 / 38.66 / 64.75，沒有任何兩顆相近，語言條件對各任務的區辨已清晰分化。
+- **`🔧 Config 修復` 訊息**：同 v2 fixed，屬預期現象，不影響推論正確性（`getattr` 預設值 + checkpoint 權重正確載入）。
+
+**實機推論結果（v3）**
+
+- **指令**：`press button 1` / `press button 2` / `press button 3`（各測試數次，`--num_steps=400`）
+- **結果**：**三個指令均執行完全相同的路徑**：先前往按鍵 1 與 3 之間，接著按壓按鍵 3，再按壓按鍵 1，軌跡完全一致 → **Mode Collapse 仍存在**。
+- **重要進步**：按鍵 1 與按鍵 3 均成功亮燈（電梯指示燈確認觸發），代表 v3 的手臂**空間精度已達到可物理按壓的水準**。v2 fixed 連可靠按中都很困難；v3 已解決空間覆蓋問題，瓶頸現在純粹集中在語言區辨上。
+
+**根本原因分析（v3 實機 vs Dummy 對比）**
+
+Dummy 測試顯示語言條件已有強烈差異（55/38/64），但實機仍 Collapse，揭示問題的本質：
+
+| 模式 | 視覺輸入 | 語言影響 | 結果 |
+|------|---------|---------|------|
+| Dummy | 隨機雜訊（無語意） | 被放大（唯一信號） | 三按鍵位移各異 |
+| 實機 | 真實面板（三組幾乎完全相同） | 被視覺壓制 | 輸出空間平均軌跡 |
+
+增加資料量與訓練步數確實強化了語言梯度（button 1 從 11.95 → 55.88），但視覺特徵的主導優勢是**架構層面的問題**：語言 token 與視覺 token 在 Self-Attention 中平等競爭，模型沒有被迫優先使用語言信號。
+
+**下一步方向**
+
+**根本原因釐清：語言路徑與 CVAE 路徑完全獨立**
+
+```
+語言路徑：instruction → DistilBERT → text_proj → concat 進 Encoder 序列
+CVAE 路徑：proprioception + future_actions → VAE Encoder → z → concat 進 Encoder 序列
+```
+
+`kl_weight` 只控制 L_KL 這一項（L_total = L_rec + kl_weight × L_KL）。由於 `text_proj` 完全不出現在 L_KL 裡，∂L_KL / ∂θ_text_proj = 0，**kl_weight 對語言梯度沒有直接影響**。降低 kl_weight 反而可能讓 z 攜帶更多任務資訊，語言信號被 z 接管——方向可能相反，此方案撤除。
+
+真正的瓶頸是：語言 token（max 16 tokens）與視覺 token（ResNet 大量空間特徵）在 Self-Attention 中平等競爭。視覺特徵信噪比高，語言信號相對太弱，注意力被視覺主導。
+
+**推論時縮放係數實驗（text_scale 診斷）**
+
+在 `inference_language_act_dualcam.py` 加入 `--text_scale` 參數，對 `text_proj` 輸出掛 PyTorch forward hook 進行推論時放大，實機測試結果：
+
+| text_scale | 實機行為 |
+|:----------:|---------|
+| 1.0（原始） | 三指令均按 1/2 中間 + 3/1 之間，完全相同路徑 |
+| 3.0 | **無改善**，路徑仍完全相同 |
+| 5.0 | **無改善**，路徑仍完全相同 |
+
+**確診結論（text_scale 實驗）：問題不在信號強度，而是架構無法讓語言主導動作決策。** Self-Attention softmax 重新正規化是已確認的原因之一。另一個假設——「VAE z 吸收了任務區辨資訊」——留待 Step 9 的 z 群集分析進行實驗驗證。
+
+---
+
+### Step 9：VAE z 群集分析——驗證 z 假設，確認根本原因
+
+**假設**：VAE encoder 在訓練時能從 `[current_state + future_action_chunk]` 識別任務（按鈕 1/2/3），z_mean (μ) 會依任務形成分離的群集；推論時 z=0 導致任務資訊消失 → Mode Collapse。
+
+**分析腳本**：[`scripts/analyze_z_clusters.py`](../scripts/analyze_z_clusters.py)
+
+```bash
+python scripts/analyze_z_clusters.py \
+  --checkpoint outputs/train/act_lc_btn_1_to_3_dualcam_v3/checkpoints/last/pretrained_model \
+  --repo_id RonLiao/lerobot-so101-elevator-6btn-dual-cam \
+  --num_samples 300 \
+  --batch_size 32
+```
+
+**分析方法**：
+- 從訓練資料集中抽取 300 × 3 個樣本，對每個樣本直接呼叫 VAE encoder（輸入：正規化後的 `state + action_chunk`）
+- 取得每個樣本的 μ 向量（latent_dim=32），依 `task_index` 分組
+- 計算群集內方差（intra-cluster variance）與群集間歐氏距離（inter-cluster distance）
+- 分離比 = inter-cluster 距離 / √intra-cluster variance：> 3 → z 高度任務可分；< 1.5 → z 幾乎不攜帶任務資訊
+
+**z 群集統計結果（v3 模型，各 300 樣本）**
+
+| 任務 | μ 均值（前4維） | 群集內方差 (MSE) |
+|------|:---:|:---:|
+| press button 1 (task_0) | [0.0011, 0.0016, -0.0047, 0.0056] | 0.0407 |
+| press button 2 (task_1) | [0.0007, 0.0023, -0.0045, 0.0058] | 0.0417 |
+| press button 3 (task_2) | [-0.0002, -0.0003, -0.0067, 0.0066] | 0.0392 |
+
+| 群集配對 | 歐氏距離 |
+|---------|:-------:|
+| button 1 ↔ button 2 | 0.0082 |
+| button 1 ↔ button 3 | 0.0095 |
+| button 2 ↔ button 3 | 0.0147 |
+
+```
+平均群集內標準差（√intra_var）: 0.2013
+平均群集間距離（inter_dist）   : 0.0108
+分離比（inter / √intra）       : 0.05
+```
+
+**結論：❌ z 假設完全不成立（分離比 0.05，遠低於門檻 1.5）**
+
+- 三個任務的 z 分布幾乎完全重疊，群集中心差異（~0.01）只有群集內標準差（0.20）的 5%
+- z ≈ N(0, ~0.04)，與任務無關——**kl_weight=10 的強正則化已將 z 壓制到接近零，VAE 無力攜帶任務資訊**
+- z-dropout 對此無效：z 本來就已接近零，訓練時也未攜帶任務線索
+
+**真正的根本原因（最終確認）**
+
+| 原因 | 狀態 | 說明 |
+|------|:----:|------|
+| Self-Attention 視覺 token 稀釋語言 | ✅ **確認** | Encoder 序列共約 620 tokens（1 latent + 1 state + 300×2 視覺 + 16 文字），語言佔比僅 2.6%；softmax 不可避免地邊緣化語言貢獻 |
+| VAE z 吸收任務區辨資訊 | ❌ **否定** | z 群集分離比 = 0.05，三任務分布完全重疊，z 未攜帶任何任務識別資訊 |
+
+**根本瓶頸只有一個**：語言 token（16 個）在 620 token 的自注意力序列中被大量視覺 token 淹沒，模型習得「忽略語言、輸出視覺平均軌跡」的局部最佳解，且 L1 重建損失對這個均值策略沒有懲罰機制。
+
+**下一步方向（根據 z 分析更新後的優先順序）**
+
+| 優先 | 方案 | 說明 |
+|:----:|------|------|
+| ⭐⭐ 最高 | **可學習 Task Embedding**（推薦） | 棄用 DistilBERT，改用 `nn.Embedding(num_tasks, dim_model)` 直接將 `task_index` 映射成可訓練向量，以 FiLM (scale + bias) 形式調製 latent token。梯度路徑最短，語言信號無法被視覺稀釋，工程量最小 |
+| ⭐ 高 | **FiLM 條件化（保留 BERT）** | 語言生成 γ/β 參數直接調製視覺特徵（scale + shift），不再 concat 進 Attention 序列；語言直接控制視覺特徵如何被處理，工程量中等 |
+| 中 | Cross-Attention 語言條件 | 語言作為 Key/Value，視覺作為 Query，語言獲得架構層面優先保證；工程量較大 |
+| 低 | 對比學習輔助 Loss | 訓練時額外懲罰「不同指令產生相同輸出」，強制語言-動作空間分離 |
+| ~~撤除~~ | ~~z-dropout 訓練~~ | ~~z 群集分析確認 z ≈ 0 且與任務無關，z-dropout 無效果~~ |
+
+---
+
+### 第六步：可學習 Task Embedding——以 FiLM 取代語言 Token 注入
+
+#### 為何要換架構？
+
+經過前幾步的反覆實驗與分析，**Mode Collapse 的根本原因已確認**：
+
+在 act_lc 架構中，語言指令（"press button 1"）先經 DistilBERT 轉換為 16 個 text token，再與約 600 個視覺 token 串接成序列，一起送進 Transformer Encoder 的 Self-Attention。
+
+問題在於 **Self-Attention 的 softmax 是零和機制**：600 個視覺 token 分走了 ~97% 的注意力權重，16 個語言 token 只剩 ~3%。模型學到的局部最佳解是「忽略語言、輸出視覺平均軌跡」——這對於 L1 重建損失而言完全合理，因為三個按鈕動作的平均仍然接近訓練資料的最小化損失點。
+
+> text_scale 實驗（×1、×3、×5）與 z 群集分析（分離比 0.05）雙雙確認：**這不是信號強度的問題，而是注入方式的問題**。就算把語言信號放大十倍，在 600 個視覺 token 的 softmax 競爭下仍會被邊緣化。
+
+#### 為何不直接移除 DistilBERT、把文字直接放進 Transformer？
+
+這個問法是合理的直覺，但問題根源不在 DistilBERT，而在**「把任務條件塞進序列參與 Self-Attention」這個注入方式本身**。移除 DistilBERT、改用原始 text token，仍然是 16 tokens vs 600 tokens 的零和競爭，問題不會消失。
+
+#### 解法：FiLM 條件化（可學習 Task Embedding）
+
+新架構 **act_te（ACT with Task Embedding）** 採用一種根本不同的條件注入方式——FiLM（Feature-wise Linear Modulation）：
+
+```
+任務條件（現在：task_index；未來：language encoder）
+         ↓
+   nn.Embedding → nn.Linear
+         ↓
+       γ,  β
+         ↓
+   FiLM：encoder_out × (1 + γ) + β
+         ↓
+   Transformer Decoder
+```
+
+**關鍵差異**：語言條件不再是序列裡的 token，而是在 Encoder 跑完之後，以**乘法 + 加法**的方式對全部 600 個 token 的輸出同時進行縮放與平移。Decoder 看到的是已被任務條件調變後的特徵，無法繞過語言信號。
+
+| 對比 | act_lc（Language-Conditioned） | act_te（Task Embedding） |
+|------|-------------------------------|--------------------------|
+| 語言注入位置 | Encoder **輸入序列**（concat） | Encoder **輸出後**（FiLM） |
+| token 競爭 | 16 語言 vs 600 視覺（零和 softmax） | 無競爭——乘法作用於全部 token |
+| 梯度路徑 | L1 loss → Decoder → Self-Attn → 語言 token（長路徑，梯度弱） | L1 loss → Decoder → FiLM → Embedding（最短路徑） |
+| 語言 encoder | DistilBERT（凍結，HTTP 下載） | `nn.Embedding(num_tasks, 512)`（可學習，無外部依賴） |
+| 未來擴充 | 難以替換（深度整合進序列） | 只需替換 Language Encoder 方塊（主流程不動） |
+
+![ACT-TE Architecture](assets/ACT_TE_Architecture.png)
+
+#### 實作說明
+
+新架構沿用 act_lc 的訓練/推論框架，透過 Monkey-patch 注入，不需修改 LeRobot 原始碼：
+
+| 檔案 | 說明 |
+|------|------|
+| [`policies/act_te/configuration_act.py`](../policies/act_te/configuration_act.py) | 繼承 vanilla ACTConfig，僅新增 `num_tasks: int = 3` |
+| [`policies/act_te/modeling_act.py`](../policies/act_te/modeling_act.py) | 移除 DistilBERT；Encoder 後加入 FiLM layer |
+| [`scripts/train_act_te.py`](../scripts/train_act_te.py) | Monkey-patch 啟動腳本 |
+| [`scripts/inference_act_te_dualcam.py`](../scripts/inference_act_te_dualcam.py) | 推論腳本，以 `--task 1/2/3` 或 `--instruction` 指定任務 |
+
+FiLM 初始化採用**零初始化**策略（`task_film` weight/bias = 0），確保訓練初期 FiLM 為恆等映射（γ=0, β=0 → 輸出不變），訓練穩定。
+
+#### 訓練
+
+使用與 act_lc v3 **完全相同的資料集**（`RonLiao/lerobot-so101-elevator-6btn-dual-cam`，每按鈕 100 集），無需重新錄製。
+
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam" \
+  --policy.type="act" \
+  --policy.num_tasks=3 \
+  --batch_size=16 \
+  --steps=100000 \
+  --eval_freq=10000 \
+  --save_freq=10000 \
+  --save_checkpoint=true \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_3_dualcam_v1" \
+  --job_name="act_te_btn_1_to_3_dualcam_v1"
+```
+
+訓練完成後上傳：
+```bash
+  python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-te-btn-1-to-3-dualcam'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_te_btn_1_to_3_dualcam_v1/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model')"
+```
+
+#### 訓練成果（act_te v1，100K 步）
+
+- **訓練日誌**：[act_te_train_20260514_150313.log](../record/act_te_train_20260514_150313.log)
+- **WandB**：[lerobot-so101-elevator-te-dualcam / rf7pgq2v](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator-te-dualcam/runs/rf7pgq2v)
+
+**概覽**：
+
+| 指標 | 數值 |
+|------|------|
+| 訓練時長 | ~16h 43min（2026-05-14 15:03 → 05-15 07:46） |
+| `num_learnable_params` / `num_total_params` | 52M / 52M（無 DistilBERT） |
+| `dataset.num_frames` | 72,248（同 act_lc v3） |
+| 初始 Loss / 初始 grdn | 6.100 / 115.9 |
+| 最終 Loss（100K） | **0.050** |
+| 最終 grdn（100K） | **2.77** |
+
+**Loss 曲線：**
+
+| Step | Loss | grdn |
+|:----:|:----:|:----:|
+| 200 | 6.100 | 115.9 |
+| 1K | 1.619 | 49.8 |
+| 5K | 0.293 | 18.1 |
+| 10K | 0.178 | 12.2 |
+| 20K | 0.119 | 8.3 |
+| 30K | 0.098 | 6.5 |
+| 50K | 0.075 | 4.6 |
+| 70K | 0.062 | 3.8 |
+| 90K | 0.055 | 3.0 |
+| **100K** | **0.050** | **2.77** |
+
+**觀察**：
+- Loss 全程單調下降，無任何 spike，訓練完全穩定
+- grdn 從 116 降至 2.77，遠低於 clip 閾值 10.0；FiLM 零初始化策略奏效，訓練初期無爆炸梯度
+- 100K 時 loss（0.050）略高於 act_lc v3（0.034），但仍在緩慢下降中，尚未出現明顯平台期
+- 與 act_lc v3 的關鍵差異：52M vs 118M total（act_te 不含 DistilBERT），更新速率完全相同（0.564s/step）
+
+#### Dummy 測試結果
+
+```bash
+python scripts/inference_act_te_dualcam.py --dummy
+```
+
+| 任務 | 總位移量 |
+|------|:-------:|
+| task_0（button 1） | 4.12 |
+| task_1（button 2） | 5.13 |
+| task_2（button 3） | 3.53 |
+| **最大/最小比** | **1.45×** |
+
+三個 task 的輸出動作序列數值不同，最大/最小比 1.45× > 1.0×，確認 FiLM 參數在 100K 訓練後已學到不同的縮放/平移，Task Embedding 有效分化。
+（若 embedding 全部崩潰，比值將等於 1.0×。）
+
+#### 實機推論結果（act_te v1，100K 步）
+
+在執行實機推論前，發現並修正了 `inference_act_te_dualcam.py` 的歸一化 Bug：
+
+**修正的 Bug（歸一化未套用）**：
+- Stats 搜尋路徑錯誤（`scripts/stats_dualcam.json` → 應為 `configs/stats_dualcam.json`）
+- 缺少 HuggingFace 自動下載 fallback
+- 輔助函式使用 numpy 計算，但 action 是 Tensor，unnormalize 完全跳過
+- **影響**：模型接收未正規化的關節角度（原始度數），輸出亦未反正規化，送進馬達的命令數值錯誤
+
+修正後，歸一化與反歸一化邏輯改為與 `inference_language_act_dualcam.py` 完全一致的 Tensor-based 流程，並從 HF dataset `RonLiao/lerobot-so101-elevator-6btn-dual-cam` 自動下載 `meta/stats.json`。
+
+**推論結果**：
+
+| 指令 | 前往位置 | 按壓成功 |
+|:----:|:-------:|:-------:|
+| `--task 1` | ✅ 正確按鈕附近 | 大部分未成功 |
+| `--task 2` | ✅ 正確按鈕附近 | 大部分未成功 |
+| `--task 3` | ✅ 正確按鈕附近 | 大部分未成功 |
+
+- **Mode Collapse 已解決**：三個 task 前往不同位置，FiLM Task Embedding 有效區辨任務
+- **定位精度不足**：機器手會到達正確按鈕附近，執行完整軌跡（出發→接近→縮回），但最終位置偏差 1~2 cm 導致大多數嘗試未能觸發按鈕
+- **Stop 條件未觸發**：螢幕持續輸出 Step，手臂持續運動直到縮回初始位置，確認問題不是提前停止，而是末端精度不足
+
+**根本原因分析**：
+
+100K 步時 loss=0.050、grdn=2.77，Loss 曲線尚無明顯平台期（仍在緩慢下降）。資料量充足（100 eps/按鈕，共 300 集），問題是**訓練步數不足以讓模型充分收斂末端精細定位**。
+
+與 act_lc v3 的比較：act_lc v3 在 step 70K~80K 後進入震盪平台；act_te v1 在 100K 時 grdn 仍有 2.77，尚未到達同等收斂深度，預期延長訓練可改善末端精度。
+
+#### 接續訓練至 200K 步（Resume）
+
+Resume 參數：
+
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam" \
+  --policy.type="act" \
+  --policy.num_tasks=3 \
+  --batch_size=16 \
+  --steps=200000 \
+  --eval_freq=10000 \
+  --save_freq=10000 \
+  --save_checkpoint=true \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_3_dualcam_v1" \
+  --job_name="act_te_btn_1_to_3_dualcam_v1" \
+  --config_path=outputs/train/act_te_btn_1_to_3_dualcam_v1/checkpoints/last/pretrained_model/train_config.json \
+  --resume=true
+```
+
+`--resume=true` 從 `checkpoints/last/training_state/` 載入 optimizer state 與 step 計數（從 step 100000 繼續），預期訓練時長與 100K 相同（約 16h 43min）。
+
+**訓練日誌**：[act_te_train_20260515_120608.log](../record/act_te_train_20260515_120608.log)
+
+#### 訓練成果（act_te v1，200K 步）
+
+| 指標 | 數值 |
+|------|------|
+| 訓練時長（100K→200K） | 16h 49min（2026-05-15 12:06 → 2026-05-16 04:55） |
+| 最終 Loss（200K） | **0.033~0.034** |
+| 最終 grdn（200K） | **1.73~1.80** |
+| 最終 epch | 44.25 |
+
+**Loss 收斂曲線（100K→200K）**
+
+| Step | Loss | grdn |
+|:----:|:----:|:----:|
+| 100K | 0.050 | 2.77 |
+| 120K | 0.045 | 2.43 |
+| 140K | 0.041 | 2.20 |
+| 160K | 0.038 | 2.00 |
+| 180K | 0.035 | 1.83 |
+| **200K** | **0.034** | **1.73** |
+
+**與歷史版本比較**
+
+| 模型 | Steps | 最終 Loss | 最終 grdn | 備註 |
+|------|:-----:|:---------:|:---------:|------|
+| act_lc v2 fixed | 100K | 0.042 | 3.9 | Language-Conditioned |
+| act_lc v3 | 200K | 0.034 | 2.4 | Language-Conditioned，300 eps |
+| **act_te v1** | **200K** | **0.034** | **1.73** | FiLM Task Embedding，300 eps |
+
+- grdn 1.73 為本專案所有版本最低，比 act_lc v3（2.4）再低 28%
+- Loss 與 act_lc v3 持平，但梯度更穩定；FiLM 梯度路徑（L1→Decoder→FiLM→Embedding）比 Self-Attention concat 短，優化更直接
+- 200K 時 Loss 仍微幅下降，已充分收斂，適合進行實機驗證
+
+#### 上傳 200K 模型至 HuggingFace
+
+覆蓋 HF 上現有的 100K 版本（同一 repo）：
+
+```bash
+python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-te-btn-1-to-3-dualcam'; api.upload_folder(folder_path='outputs/train/act_te_btn_1_to_3_dualcam_v1/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model')"
+```
+
+#### 實機推論驗證（200K）
+
+```bash
+# Dummy 測試（確認 Task Embedding 區辨比值）
+python scripts/inference_act_te_dualcam.py --dummy
+
+# 實機推論（各測試數次）
+python scripts/inference_act_te_dualcam.py --task 1
+python scripts/inference_act_te_dualcam.py --task 2
+python scripts/inference_act_te_dualcam.py --task 3
+```
+
+**Dummy 測試結果（200K）**
+
+| 版本 | task_0（button 1） | task_1（button 2） | task_2（button 3） | 最大/最小比 |
+|:----:|:-----------------:|:-----------------:|:-----------------:|:-----------:|
+| 100K | 4.12 | 5.13 | 3.53 | 1.45× |
+| **200K** | **4.97** | **5.50** | **4.81** | **1.14×** |
+
+比值從 1.45× 降至 1.14×，三個 task 的位移量更集中。這不代表退步——更多訓練讓輸出幅度更穩定，但軌跡方向可能分化更清楚，dummy 的純量位移無法捕捉方向差異。實機測試為最終判斷依據。
+
+**實機推論結果（200K）**
+
+| 指令 | 前往位置 | 按壓成功率 |
+|:----:|:-------:|:---------:|
+| `--task 1` | ✅ 正確按鈕附近 | ~30-40% |
+| `--task 2` | ✅ 正確按鈕附近 | ~30-40% |
+| `--task 3` | ✅ 正確按鈕附近 | ~30-40% |
+
+**關鍵結論**：
+
+- **Mode Collapse 已解決**：三個 task 各自前往對應按鈕方向，FiLM Task Embedding 成功取代 DistilBERT，區辨能力確認
+- **精度瓶頸（30-40% 成功率）**：未成功的案例偏差約 1cm，或到達正確位置但按壓力度略不足；Stop 條件未提前觸發（螢幕持續輸出 Step，手臂完整執行出發→接近→縮回）
+
+**精度瓶頸分析**：
+
+成功率 30-40%、失誤全在 1cm 以內——這個結果說明：**模型的「任務定位」已經正確**（知道要去哪顆按鈕），瓶頸在「末端精度」的最後一公分。更多資料是方向之一，但不一定是唯一解法；先釐清原因再決定補救方向。
+
+| 可能原因 | 可能性 | 說明 |
+|---------|:------:|------|
+| 訓練示範的末端按壓位置有自然變異 | ⭐⭐⭐ 高 | 人工示範時每次按壓位置有 ±1~2cm 的自然抖動，模型學到的是「平均落點」，平均值可能剛好在按鈕邊緣 |
+| 資料量不足（100 eps/按鈕） | ⭐⭐ 中 | 更多資料可以縮小平均值的統計誤差，讓模型估計更準；但若示範本身就散，補更多散的資料效果有限 |
+| Action chunk 在按壓瞬間平滑過頭 | ⭐⭐ 中 | ACT 預測整段 chunk（100 步），過渡時的動作平滑可能讓末端位置略偏；縮短 `n_action_steps` 可讓模型更頻繁重新規劃 |
+| `n_obs_steps=1` 無法做靠近時的細微修正 | ⭐ 低 | 只看當前單幀，無法利用連續幀感知靠近過程中的細微偏移 |
+
+#### 示範一致性量化分析
+
+對每集找出「按壓幀」（從 home 出發後關節總位移最大的幀），統計各任務的按壓姿態分散程度：
+
+```bash
+python scripts/analyze_press_consistency.py
+```
+
+**button_1**（100 集）
+
+| 關節 | 平均 | std | max-min | 評估 |
+|------|-----:|----:|--------:|:----:|
+| shoulder_pan | 43.90° | 3.79° | 30.36° | ⚠️ 中等 |
+| shoulder_lift | -17.07° | 11.05° | 103.01° | ❌ 分散 |
+| elbow_flex | -12.74° | 16.54° | 140.42° | ❌ 分散 |
+| **wrist_flex** | **49.43°** | **18.30°** | **166.54°** | ❌ 分散 |
+| **wrist_roll** | **1.71°** | **4.40°** | **19.19°** | ❌ 分散 |
+| gripper | 1.64° | 0.36° | 0.80° | ✅ 一致 |
+
+末端平均 std（wrist_flex + wrist_roll）= **11.35°** ❌
+
+**button_2**（100 集）
+
+| 關節 | 平均 | std | max-min | 評估 |
+|------|-----:|----:|--------:|:----:|
+| shoulder_pan | 52.31° | 4.53° | 30.44° | ❌ 分散 |
+| shoulder_lift | -26.11° | 6.77° | 37.89° | ❌ 分散 |
+| elbow_flex | -10.08° | 9.33° | 59.22° | ❌ 分散 |
+| **wrist_flex** | **57.72°** | **9.28°** | **57.97°** | ❌ 分散 |
+| **wrist_roll** | **1.14°** | **3.02°** | **12.26°** | ❌ 分散 |
+| gripper | 1.60° | 0.36° | 0.87° | ✅ 一致 |
+
+末端平均 std（wrist_flex + wrist_roll）= **6.15°** ❌
+
+**button_3**（100 集）
+
+| 關節 | 平均 | std | max-min | 評估 |
+|------|-----:|----:|--------:|:----:|
+| shoulder_pan | 44.95° | 7.48° | 55.10° | ❌ 分散 |
+| shoulder_lift | -16.25° | 15.62° | 101.53° | ❌ 分散 |
+| elbow_flex | -17.41° | 24.02° | 150.07° | ❌ 分散 |
+| **wrist_flex** | **36.57°** | **24.18°** | **169.06°** | ❌ 分散 |
+| **wrist_roll** | **0.58°** | **9.32°** | **97.58°** | ❌ 分散 |
+| gripper | 1.58° | 0.37° | 0.87° | ✅ 一致 |
+
+末端平均 std（wrist_flex + wrist_roll）= **16.75°** ❌
+
+（評估門檻：std < 1° ✅；1~2° ⚠️；> 2° ❌。末端關節門檻更嚴：wrist < 1° ✅、< 2° ⚠️）
+
+**結論**：三個按鈕的示範一致性均遠低於門檻，確認「示範手腕姿態不一致」是精度瓶頸主因。
+
+> **關於 shoulder / elbow 分散**：shoulder_pan / shoulder_lift / elbow_flex 的 std 大不代表問題——6-DOF 手臂有 IK 冗餘自由度，相同末端位置可用不同大臂角度到達。真正需要一致的只有 **wrist_flex 與 wrist_roll**，它們決定手指接觸按鈕的方向與角度。
+
+**改善方向（優先順序）**：
+
+1. **補錄時統一手腕姿態（最有效）**：每次示範前先把 wrist_flex、wrist_roll 調到固定角度（例如兩者皆約 0°），再移動整個手臂靠近按鈕；不要為了讓大臂「方便到達」而中途調整手腕
+2. **降低 `n_action_steps`**：縮短每次 chunk 執行長度，讓模型更頻繁重新規劃——**但需要從訓練時就設定，推論時覆蓋無效**。實驗確認：推論時設 10/20/50 均導致手臂在 home 位置抖動，無法正常伸出，原因是模型學的是完整 100 步軌跡，前幾步位移極小，中斷後重規劃形成死循環。
+3. **強化 Wrist Camera 近距離視覺**：wrist cam 已在架構中，搭配更多 close-range 示範，讓模型習得靠近時的視覺-動作對應
+
+

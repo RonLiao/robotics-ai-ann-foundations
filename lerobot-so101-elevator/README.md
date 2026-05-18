@@ -81,7 +81,25 @@
     - **[已完成]** 建立新 Dataset Repo (`RonLiao/lerobot-so101-elevator-6btn-dual-cam`) 並重新錄製（各 50 Episodes）。
     - **[已完成]** 訓練含手眼視角的 dualcam 模型，上傳至 `RonLiao/so101-elevator-act-lc-btn-1-to-3-dualcam`。
     - **[已完成]** 新建 `scripts/inference_language_act_dualcam.py` 支援雙相機推論，Dummy 測試通過。
-    - **[進行中]** 實機推論部署除錯：3 顆按鈕均無法精準按壓，除錯中。
+    - **[進行中]** 實機推論部署除錯：3 顆按鈕均無法精準按壓。
+      - **[已排除]** 雙相機視角對齊：推論首幀與訓練集截圖高度吻合（front + wrist 均正常），手眼相機無偏移。
+      - **[已排除]** Stats 歸一化對齊：Dummy 測試確認 `stats_dualcam.json` 已正確載入（state mean/std 數值合理），此項排除。
+      - **[已修正，重訓完成]** Checkpoint 中 `text_proj` 權重遺失（根本原因：Monkey-patch 僅替換 ACTPolicy 未替換 ACTConfig，導致語言條件從未啟用）：已修正 `train_act_lc.py` 與 `modeling_act.py`，以修正後腳本重訓 100K 步（`act_lc_btn_1_to_3_dualcam_v2`）。重訓 Log 確認 `num_total_params=118M`（vs bug 版 52M），66M 差值即為 DistilBERT，語言條件已生效。
+    - **[已完成]** 驗證 v2 fixed checkpoint 含 `text_proj` key（`torch.allclose` 確認權重正確載入）。
+    - **[已完成]** 實機推論部署。Dummy 測試確認語言條件有效（button 1 vs button 2 在 Step 100 位移量差達三倍），但實機三個按鈕指令仍落在同一位置（按鍵 1/3 中間偏右）。
+    - **[已確認瓶頸]** 語言條件技術上生效，但語言信號強度不足以克服三顆按鈕視覺特徵高度相似的問題，模型在 100K 步 / 50 Episodes 訓練量下仍向空間均值坍塌（Mode Collapse）。
+    - **[已完成]** 補錄至每顆按鈕 100 Episodes（新增 50 集全由標準起始位置錄製，強化樣本密度），上傳至 `RonLiao/lerobot-so101-elevator-6btn-dual-cam`（共 300 Episodes）。
+    - **[已完成]** 以 200K 步重訓 v3 模型（`act_lc_btn_1_to_3_dualcam_v3`）：Loss 0.034，grdn ~2.4，語言條件生效但實機仍 Mode Collapse。
+    - **[已完成]** VAE z 群集分析（`scripts/analyze_z_clusters.py`）：確認 z 分離比 = 0.05，z 未攜帶任務資訊，z-dropout 假設排除；**根本原因確認為語言 token 在 620-token Self-Attention 序列中被視覺 token 稀釋**。
+  - **[進行中]** 第六步：架構改善——可學習 Task Embedding（以 FiLM 調製取代語言 token concat）。
+    - **[已完成]** text_scale 實驗（×1、×3、×5）確認問題不在信號強度，排除信號衰減假設。
+    - **[已完成]** VAE z 群集分析（`scripts/analyze_z_clusters.py`）：分離比 = 0.05，確認 z 未攜帶任務資訊，排除 z-dropout 假設；根本原因確認為 Self-Attention 中語言 token 被視覺 token 稀釋。
+    - **[已完成]** 設計並實作 act_te 架構（`policies/act_te/`）：繼承 vanilla ACTConfig，新增 `num_tasks` 欄位；以 `nn.Embedding + FiLM` 取代 DistilBERT，語言條件施加於 Encoder 輸出後、Decoder 前，梯度路徑最短且無 token 競爭。
+    - **[已完成]** 建立訓練腳本 `scripts/train_act_te.py` 與推論腳本 `scripts/inference_act_te_dualcam.py`。
+    - **[已完成]** 更新架構圖 `docs/assets/ACT_TE_Architecture.png`：Text 走側路 → Language Encoder → FiLM，不再塞進 Encoder 序列。
+    - **[已完成]** act_te v1 訓練至 200K 步（100K→200K resume），最終 Loss=0.034、grdn=1.73（本專案最低），WandB：[rf7pgq2v](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator-te-dualcam/runs/rf7pgq2v)。
+    - **[已完成]** Dummy test：100K 1.45×；200K 1.14×，Task Embedding 有效分化。
+    - **[進行中]** 實機推論精度優化：Mode Collapse 已解決，成功率 30-40%，末端偏差 ~1cm（精度優化中）。
     - **[待進行]** 完成其餘 3 顆按鈕 (按鈕 4~6) 的錄製（保留後續擴充）。
 
 ### 階段三：視覺-語言-動作大模型 (VLA) 實作
