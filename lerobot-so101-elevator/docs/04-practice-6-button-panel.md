@@ -936,6 +936,29 @@ python scripts/analyze_z_clusters.py \
 
 > text_scale 實驗（×1、×3、×5）與 z 群集分析（分離比 0.05）雙雙確認：**這不是信號強度的問題，而是注入方式的問題**。就算把語言信號放大十倍，在 600 個視覺 token 的 softmax 競爭下仍會被邊緣化。
 
+#### 為何 MT-ACT（RoboAgent）用同樣的 concat 方式卻沒失敗？
+
+MT-ACT（arxiv 2309.01918）與 act_lc 採用完全相同的架構：語言 token concat 進 Encoder 序列、kl_weight=10、z 塌縮。但 MT-ACT 沒有遇到相同的失敗。
+
+**直覺上的質疑**：電梯按鈕上印有數字「1」「2」「3」，視覺上應該可以區分任務，為何說視覺不夠？
+
+這個質疑是合理的。按鈕數字確實存在，但在實踐中有兩個限制讓視覺區辨失效：
+
+1. **推論起點視覺上下文相同**：手臂在 home 位置時，前相機看到的是整面按鈕面板——三顆按鈕全部出現在同一個畫面裡。不論要按哪顆，第一幀的視覺輸入幾乎完全相同。模型必須在這個起點決定往哪個方向移動，但三個任務的起點視覺一致，視覺 token 無法提供任務差異信號。
+
+2. **ResNet 對小文字辨識能力有限**：ResNet backbone 為物件辨識訓練，對空間特徵（形狀、顏色、紋理）敏感，但對小尺寸數字讀取能力弱。按鈕在 640×480 畫面中僅佔幾十個像素，數字「1」和「2」在 ResNet 特徵空間裡的差異極小。act_lc v2（語言 bug 修正後）的實機測試已確認：三個指令仍輸出完全相同的軌跡，驗證視覺特徵在實際訓練中沒有被用來做任務區辨。
+
+相比之下，MT-ACT 的 12 個任務（抓取、疊放、轉移…）各有截然不同的物件、位置與場景，視覺差異是高層次的（不同物件、不同環境），ResNet 能輕易提取。視覺 token 即使主導了 97% 的 Attention，也已攜帶足夠的任務信號，語言 token 在 MT-ACT 裡是**錦上添花**。
+
+| | MT-ACT | act_lc（電梯按鈕）|
+|---|---|---|
+| 視覺任務差異層次 | 高層次（不同物件、場景）| 細粒度（同一面板，數字差異）|
+| ResNet 能可靠提取？ | ✅ 是 | ❌ 否（小文字、起點畫面相同）|
+| 語言 token 被稀釋時 | 視覺仍可補救 | 無後路，完全崩潰 |
+| 結果 | 語言 concat 可行 | 語言 concat 失敗 |
+
+**結論**：MT-ACT 的成功不代表「語言 token concat 進 Self-Attention」是可靠的方案，只代表 MT-ACT 的任務設計恰好讓視覺特徵（高層次場景差異）做了語言的份內工作。電梯按鈕場景的視覺差異是細粒度的，ResNet 在推論起點無法可靠提取，語言 token 成為唯一任務信號，一旦被視覺淹沒即完全崩潰。
+
 #### 為何不直接移除 DistilBERT、把文字直接放進 Transformer？
 
 這個問法是合理的直覺，但問題根源不在 DistilBERT，而在**「把任務條件塞進序列參與 Self-Attention」這個注入方式本身**。移除 DistilBERT、改用原始 text token，仍然是 16 tokens vs 600 tokens 的零和競爭，問題不會消失。
@@ -1258,7 +1281,157 @@ python scripts/analyze_press_consistency.py
 **改善方向（優先順序）**：
 
 1. **補錄時統一手腕姿態（最有效）**：每次示範前先把 wrist_flex、wrist_roll 調到固定角度（例如兩者皆約 0°），再移動整個手臂靠近按鈕；不要為了讓大臂「方便到達」而中途調整手腕
-2. **降低 `n_action_steps`**：縮短每次 chunk 執行長度，讓模型更頻繁重新規劃——**但需要從訓練時就設定，推論時覆蓋無效**。實驗確認：推論時設 10/20/50 均導致手臂在 home 位置抖動，無法正常伸出，原因是模型學的是完整 100 步軌跡，前幾步位移極小，中斷後重規劃形成死循環。
-3. **強化 Wrist Camera 近距離視覺**：wrist cam 已在架構中，搭配更多 close-range 示範，讓模型習得靠近時的視覺-動作對應
+2. **降低 `kl_weight`（需重訓，結果不確定）**：降低 KL 正則化強度（預設 10 → 試 1.0 或 0.1），讓 encoder 有空間在 z 空間分離不同的 wrist 接近路徑；z=0 對應到其中一個具體模式，decoder 不再收到衝突監督信號。z 群集分析已確認 act_te v1 分離比 = **0.09**（完全塌縮，與 act_lc 的 0.05 同等級），降低 kl_weight 有理論依據。**注意**：z=0 對應的模式是學習動態決定的，無法保證是最精準的接近角度；重訓後需再跑 `analyze_z_clusters_te.py` 確認分離比升到 > 1.5
+3. **降低 `n_action_steps`**：縮短每次 chunk 執行長度，讓模型更頻繁重新規劃——**但需要從訓練時就設定，推論時覆蓋無效**。實驗確認：推論時設 10/20/50 均導致手臂在 home 位置抖動，無法正常伸出，原因是模型學的是完整 100 步軌跡，前幾步位移極小，中斷後重規劃形成死循環。
+4. **強化 Wrist Camera 近距離視覺**：wrist cam 已在架構中，搭配更多 close-range 示範，讓模型習得靠近時的視覺-動作對應
+
+#### 理論背景：CVAE 為何無法自動解決示範不一致？
+
+CVAE 引入的動機正是處理「同一起點、多條合理路徑」的多模態問題——訓練時 z 理論上能編碼「這集示範走的是哪條路徑」，推論時 sample 不同 z 即可選出不同模式。
+
+**重要：z=0 是 decoder 在 z=0 這個具體點學到的特定輸出，不是所有路徑的數學平均值。**
+
+問題出在 **kl_weight=10 讓 encoder 無法分離不同路徑**，導致 decoder 在 z≈0 附近收到衝突的監督信號：
+
+- 示範 A（wrist_flex=30° 路徑）→ encoder → z₁ ≈ [0.1, 0.2, ...]
+- 示範 B（wrist_flex=70° 路徑）→ encoder → z₂ ≈ [-0.1, 0.3, ...]
+- 強正則化把 z₁、z₂ 都壓在 0 附近（z 群集分析已確認：分離比 0.05）
+
+Decoder 在 z₁ 被訓練輸出 30° 路徑，在 z₂ 被訓練輸出 70° 路徑。z₁ ≈ z₂ → decoder 在同一個 z 區域承受衝突的 L1 loss → 收斂到一個讓兩者 loss 都不大、但哪條都不精準的折衷輸出。
+
+| | CVAE 設計意圖 | ACT 實際（kl_weight=10） |
+|--|:---:|:---:|
+| z 是否分離路徑模式？ | ✅ 訓練時會 | ❌ KL 壓縮後 z₁≈z₂≈0（分離比 0.05） |
+| Decoder 是否有衝突？ | ❌ z 分離則無衝突 | ✅ z₁≈z₂ → 衝突監督信號 |
+| 結果 | 可處理不一致示範 | Decoder 輸出退化為折衷軌跡 |
+
+**降低 kl_weight 的理論邏輯**：允許 z₁ 和 z₂ 真正分離，decoder 在不同 z 值各自學到清晰的路徑，衝突消失，z=0 對應分布中心的「典型路徑」。風險：kl_weight 過低時 prior 與 posterior 偏離過大，推論時 z=0 落在訓練分布之外，輸出品質反而下降。
+
+**補錄一致示範的理論邏輯**：消除多模態根源——所有示範都走相同路徑，z₁ ≈ z₂ 仍成立，但 decoder 在 z≈0 處只見到一種監督信號，衝突不存在，輸出乾淨收斂。不需要調 kl_weight，效果更可預期。
+
+#### act_te z 群集分析結果（v1，200K 步）
+
+```bash
+python scripts/analyze_z_clusters_te.py \
+  --checkpoint outputs/train/act_te_btn_1_to_3_dualcam_v1/checkpoints/last/pretrained_model \
+  --repo_id RonLiao/lerobot-so101-elevator-6btn-dual-cam \
+  --num_samples 300 --batch_size 32
+```
+
+| 任務 | 群集內方差（MSE） | 與其他任務平均距離 |
+|------|-----------------|-------------------|
+| button_1 | 0.0068 | 0.011 |
+| button_2 | 0.0108 | 0.008 |
+| button_3 | 0.0135 | 0.009 |
+
+```
+平均群集內標準差（√intra_var）: 0.1019
+平均群集間距離（inter_dist）   : 0.0095
+分離比（inter / √intra）       : 0.09
+```
+
+**結論**：分離比 **0.09**，遠低於門檻 1.5，與 act_lc（0.05）同屬「z 完全塌縮」等級。  
+act_te 稍高（0.09 vs 0.05）的原因：FiLM 已接管任務條件化，z 稍微多了一點自由度，但 kl_weight=10 仍將所有路徑壓到 z≈0。  
+確認降低 kl_weight 有理論依據——z 未攜帶任何任務/路徑資訊，純屬 kl 過強所致。
+
+#### act_te v2：降低 kl_weight 重訓（kl_weight=1.0）
+
+| 參數 | v1 | v2 |
+|---|---|---|
+| kl_weight | 10.0 | **1.0** |
+| z 分離比（預期）| 0.09（塌縮）| > 1.5（目標）|
+| output_dir | act_te_btn_1_to_3_dualcam_v1 | act_te_btn_1_to_3_dualcam_v2 |
+
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam" \
+  --policy.type="act" \
+  --policy.num_tasks=3 \
+  --policy.kl_weight=1.0 \
+  --policy.chunk_size=100 \
+  --policy.n_action_steps=100 \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_3_dualcam_v2" \
+  --job_name="act_te_btn_1_to_3_dualcam_v2"
+```
+
+訓練到 100K 步後先跑分析確認分離比：
+
+```bash
+python scripts/analyze_z_clusters_te.py \
+  --checkpoint outputs/train/act_te_btn_1_to_3_dualcam_v2/checkpoints/last/pretrained_model \
+  --repo_id RonLiao/lerobot-so101-elevator-6btn-dual-cam \
+  --num_samples 300 --batch_size 32
+```
+
+- 分離比 > 1.5 → 繼續訓到 200K 再實機測試
+- 分離比仍 < 1.5 → 考慮進一步降低至 `kl_weight=0.1`（風險：z=0 落在訓練分布之外）
+
+#### act_te v2 z 群集分析結果（kl_weight=1.0，100K 步）
+
+| 指標 | v1（kl=10.0）| v2（kl=1.0）| 變化 |
+|---|---|---|---|
+| 平均群集內標準差（√intra_var）| 0.1019 | 0.3378 | +3.3× |
+| 平均群集間距離（inter_dist）| 0.0095 | 0.0623 | +6.6× |
+| 分離比（inter / √intra）| 0.09 | **0.18** | +2× |
+
+任務群集詳細數值：
+
+| 任務 | 群集內方差（MSE）| 群心（前4維）|
+|---|---|---|
+| button_1 | 0.1152 | [-0.068, -0.037, -0.087, -0.015] |
+| button_2 | 0.1336 | [-0.070, -0.043, -0.094, -0.016] |
+| button_3 | 0.0935 | [-0.061, -0.036, -0.081, -0.013] |
+
+任務對距離：button_1↔button_2: 0.034、button_1↔button_3: 0.061、button_2↔button_3: 0.093
+
+**數值解讀**：分離比從 0.09 提升至 0.18（+2×），kl_weight 降低確實讓 z 獲得更多自由度，但距門檻 1.5 仍差距很大。
+
+**重要修正——此分析指標對 act_te 可能是錯的診斷維度**：
+
+這個腳本量的是**任務間** z 分離。但在 act_te 架構中，任務區辨由 FiLM 負責，z 本來就不應該按任務分群。z 真正應該做的是分離**同一任務內**的不同 wrist 接近路徑（intra-task 路徑分離）。
+
+高 intra_var（√intra=0.34，是 v1 的 3.3 倍）反而可能是正面信號——代表 encoder 在各任務內部對不同路徑模式編碼了不同的 z 值。但現有腳本無法判斷這些分散是有意義的路徑分離還是噪音。
+
+**結論**：z 群集分析無法給出 act_te v2 的最終評價，需要實機推論測試才能確認 kl_weight=1.0 是否改善了精度。
+
+#### act_te v2 上傳與實機推論
+
+上傳至 HuggingFace：
+
+```bash
+python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-te-btn-1-to-3-dualcam-v2'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_te_btn_1_to_3_dualcam_v2/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model'); print('上傳完成：', repo_id)"
+```
+
+實機推論（`--task` 換 1/2/3 測試各按鈕）：
+
+```bash
+python scripts/inference_act_te_dualcam.py --repo_id RonLiao/so101-elevator-act-te-btn-1-to-3-dualcam-v2 --task 3 --num_steps 400
+```
+
+#### act_te v2 實機推論結果
+
+| 按鈕 | 示範 wrist_flex std | 結果 |
+|---|---|---|
+| button_1 | 18.30°（高）| ❌ 每次固定偏移，從未成功 |
+| button_2 | 9.28°（最低）| ⚠️ num_steps=400 第三輪嘗試成功 |
+| button_3 | 24.18°（最高）| ❌ 每次固定偏移，從未成功 |
+
+**觀察**：
+- 三條軌跡各自固定且不同 → FiLM 任務條件化正常，v2 已解決 v1 的 mode collapse ✅
+- 每條軌跡都有系統性偏移 → 模型收斂到各任務示範的平均 wrist 位置，而非按鈕中心
+- button_2 最接近成功，對應其 wrist std 最低（示範最一致）——**完整確認瓶頸是示範 wrist 姿態分散，而非模型容量或訓練步數**
+
+**繼續訓練至 200K 無法改善**：系統性偏移來自訓練資料的分布，更多訓練只會讓模型更穩固地收斂到同一個偏移位置。
+
+**下一步方向**：
+
+| 方案 | 預期效果 | 代價 |
+|---|---|---|
+| 重新錄製示範（統一 wrist 姿態）| ✅ 直接消除系統性偏移 | 每按鈕 50–100 集補錄 |
+| 實作 MoE-ACT | ✅ expert 分流吸收不同 wrist 路徑 | 架構改寫 + 需更多資料 |
+| 繼續降低 kl_weight | ❓ 不確定 | 需重訓驗證 |
 
 
