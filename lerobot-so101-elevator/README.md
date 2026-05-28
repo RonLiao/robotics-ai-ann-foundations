@@ -99,7 +99,9 @@
     - **[已完成]** 更新架構圖 `docs/assets/ACT_TE_Architecture.png`：Text 走側路 → Language Encoder → FiLM，不再塞進 Encoder 序列。
     - **[已完成]** act_te v1 訓練至 200K 步（100K→200K resume），最終 Loss=0.034、grdn=1.73（本專案最低），WandB：[rf7pgq2v](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator-te-dualcam/runs/rf7pgq2v)。
     - **[已完成]** Dummy test：100K 1.45×；200K 1.14×，Task Embedding 有效分化。
-    - **[進行中]** 實機推論精度優化：Mode Collapse 已解決，成功率 30-40%，末端偏差 ~1cm（精度優化中）。
+    - **[已完成]** act_te v1（kl_weight=10）實機推論：成功率 30-40%，末端偏差 ~1cm；z 群集分析確認分離比 0.09（z 完全塌縮）。
+    - **[已完成]** act_te v2（kl_weight=1.0）重訓 100K 步：z 分離比提升至 0.18，但仍遠低於門檻 1.5；實機測試確認三條軌跡各自固定（FiLM 任務條件化正常），但每條軌跡存在系統性偏移——根本原因確認為示範 wrist 姿態不一致（wrist_flex std 達 9–24°）。
+    - **[進行中]** 第七步：重新錄製一致示範（act_te v3）。示範流程：初始位置 → 伸直 wrist_flex/wrist_roll 至固定角度 → 僅移動 shoulder/elbow 按下按鈕 → 回到初始位置；chunk_size=250（完整來回約 7–8 秒）；建立全新資料集，不混入舊不一致示範。
     - **[待進行]** 完成其餘 3 顆按鈕 (按鈕 4~6) 的錄製（保留後續擴充）。
 
 ### 階段三：視覺-語言-動作大模型 (VLA) 實作

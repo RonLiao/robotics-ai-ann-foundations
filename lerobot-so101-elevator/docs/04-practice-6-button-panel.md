@@ -1426,6 +1426,77 @@ python scripts/inference_act_te_dualcam.py --repo_id RonLiao/so101-elevator-act-
 
 **繼續訓練至 200K 無法改善**：系統性偏移來自訓練資料的分布，更多訓練只會讓模型更穩固地收斂到同一個偏移位置。
 
+#### act_te v2 引入閉環控制實驗 (Temporal Ensembling + FPS 控制)
+
+在觀察到 `v2` 存在嚴重的「每次固定偏移」問題後，我們進行了一次消融實驗（Ablation Study）。我們建立了一份新的實驗腳本 `scripts/inference_act_te_v2_experiment.py`，為原本開環的 `v2` 模型加入了兩項重要機制：
+1. **30 Hz FPS 控制**：確保硬體馬達有足夠時間執行軌跡，避免超速掉幀。
+2. **Temporal Ensembling (TE) 閉環控制**：強制模型每一幀都看見最新畫面，並將過去與現在的軌跡進行指數加權平均。
+
+**推論指令**：
+```bash
+python scripts/inference_act_te_v2_experiment.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-3-dualcam-v2 \
+  --task 2 \
+  --te_coeff 0.1
+```
+
+**實驗結果與結論**：
+- **`te_coeff = 0.1`**：原本開環時的「固定偏移」奇蹟般地消失了！手臂會非常滑順且明確地瞄準按鈕。然而，它會在碰到按鍵表面時停住，**缺乏最後一下發力按下去的動作**。這是因為 TE 會將 250 步的預測平均化，導致「戳擊」這種短時間（可能只有幾幀）的高頻突波被過度平滑化。
+- **`te_coeff = 0.5` 與 `0.8`**：為了減少平滑化，我們嘗試調高指數衰減係數，讓模型「快速遺忘」舊軌跡以保留戳擊力道。但實測發現動作變得**過度激烈且抖動**，有損壞實體手臂的風險。
+- **關閉 TE 改用 MPC (n_action_steps=50)**：如果完全關閉 TE，模型會產生嚴重的**模式崩潰 (Mode Collapse)**，每 50 步重新看畫面時就會瞬間彈回初始收合角度。這證明模型對初始狀態有極強的依賴，無法處理走到一半的陌生影像。
+
+**總結**：開啟 Temporal Ensembling 絕對是正確且必要的步驟，它能有效解決偏移與模式崩潰。至於「最後一下戳擊力道被抹平」的問題，強行調整 `te_coeff` 並非正解，後續應該從資料集的按壓特徵（讓戳擊在數據中佔比更長或更明顯）或訓練步數來著手改善。
+
+#### act_te v3 錄製停頓特徵資料集與訓練 (解決 TE 平滑化問題)
+
+為了解決 Temporal Ensembling 過度平滑化導致「最後一下戳擊不發力」的問題，決定採用 Imitation Learning 的最佳實踐：**在按壓到底的姿態刻意停頓約 1 秒 (30 幀)**，讓目標軌跡形成一個強勢的「高原特徵」，以抵抗 TE 的平均效應。
+
+為保持舊資料與新資料的連貫性，我們直接在原有的資料集 `RonLiao/lerobot-so101-elevator-6btn-dual-cam` 中，為每個按鈕各補錄 100 集（總集數將達 600 集）。
+
+**1. 補錄新示範 (停頓 1 秒版)**：
+請在按到底的時候，穩穩地抵住按鈕停頓約 1 秒，然後再收回手臂。
+```bash
+# 按鈕 1：補錄 100 集 (使用預設的 resume=true)
+bash scripts/record_6btn_dual_cam.sh 1 100
+
+# 按鈕 2：補錄 100 集
+bash scripts/record_6btn_dual_cam.sh 2 100
+
+# 按鈕 3：補錄 100 集
+bash scripts/record_6btn_dual_cam.sh 3 100
+```
+
+**2. 重新上傳更新後的資料集至 HuggingFace**：
+```bash
+python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset; LeRobotDataset('RonLiao/lerobot-so101-elevator-6btn-dual-cam').push_to_hub()"
+```
+
+**3. 訓練 act_te v3 模型**：
+使用 `chunk_size=100`（每次預測 3.3 秒軌跡），搭配推論時的 Temporal Ensembling 閉環控制（chunk_size 不需要等於完整示範長度，ACT 支援 `chunk_size < episode_length` 滾動重新規劃；詳見本文「真相四」）：
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam" \
+  --policy.type="act" \
+  --policy.num_tasks=3 \
+  --policy.kl_weight=1.0 \
+  --policy.chunk_size=100 \
+  --policy.n_action_steps=100 \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_3_dualcam_v3" \
+  --job_name="act_te_btn_1_to_3_dualcam_v3"
+```
+
+訓練完成後，請繼續使用 `inference_act_te_v2_experiment.py`（搭配 `te_coeff=0.1`）進行推論，預期能看到兼具滑順與明確按壓深度的完美表現！
+
+**觀察**：
+- 三條軌跡各自固定且不同 → FiLM 任務條件化正常，v2 已解決 v1 的 mode collapse ✅
+- 每條軌跡都有系統性偏移 → 模型收斂到各任務示範的平均 wrist 位置，而非按鈕中心
+- button_2 最接近成功，對應其 wrist std 最低（示範最一致）——**完整確認瓶頸是示範 wrist 姿態分散，而非模型容量或訓練步數**
+
+**繼續訓練至 200K 無法改善**：系統性偏移來自訓練資料的分布，更多訓練只會讓模型更穩固地收斂到同一個偏移位置。
+
 **下一步方向**：
 
 | 方案 | 預期效果 | 代價 |
@@ -1434,4 +1505,828 @@ python scripts/inference_act_te_dualcam.py --repo_id RonLiao/so101-elevator-act-
 | 實作 MoE-ACT | ✅ expert 分流吸收不同 wrist 路徑 | 架構改寫 + 需更多資料 |
 | 繼續降低 kl_weight | ❓ 不確定 | 需重訓驗證 |
 
+### 第七步：重新錄製一致示範（act_te v3）
 
+#### 錄製重點
+
+**1. 量測 chunk_size**
+
+錄製前先手動完整示範一次，計時從初始位置到按下按鈕再**回到初始位置**的總時間（示範包含回到初始位置完全沒問題，chunk_size 以完整來回長度為準，推論時機器手臂也會執行回到初始位置）：
+
+| 完整示範時間 | 幀數（30fps）| 建議 chunk_size |
+|---|---|---|
+| 4 秒 | 120 幀 | 150 |
+| 5 秒 | 150 幀 | 180 |
+| 6 秒 | 180 幀 | 200 |
+| **7–8 秒（實測）** | **210–240 幀** | **250（採用）** |
+
+錄完幾集後用以下指令確認實際最長幀數，再決定最終 chunk_size：
+
+```bash
+python -c "
+from lerobot.datasets.lerobot_dataset import LeRobotDataset
+import numpy as np
+ds = LeRobotDataset('RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist')
+ep_idx = ds.hf_dataset['episode_index']
+boundaries = np.where(np.diff(ep_idx))[0] + 1
+lengths = np.diff(np.concatenate([[0], boundaries, [len(ep_idx)]]))
+print(f'最短: {lengths.min()}, 最長: {lengths.max()}, 平均: {lengths.mean():.1f}')
+"
+```
+
+**2. 示範流程（每集必須嚴格一致）**
+
+```
+初始位置（wrist 因重力縮起）
+  → 伸直 wrist_flex + 擺正 wrist_roll 至標準角度
+  → 保持 wrist_flex / wrist_roll / gripper 角度完全不變
+  → 僅移動 shoulder_pan / shoulder_lift / elbow_flex 到達目標按鈕
+  → 按下按鈕
+  → 回到初始位置
+```
+
+**標準 wrist 角度的確立**：第一次示範前找到一個 wrist_flex / wrist_roll 角度，使手臂在此姿態下能自然到達三顆按鈕。記下這個數值，之後每集「伸直完成」的停止點都以此為準——伸直中間狀態的一致性與按下按鈕時的一致性同樣重要。
+
+#### 資料集策略
+
+重新建立全新資料集 `RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist`，**不混入舊的不一致示範**：
+
+| 做法 | 效果 |
+|---|---|
+| ✅ 新資料集，只放一致示範（100 集/按鈕）| 乾淨，推薦 |
+| ❌ 舊資料集加 100 集一致示範 | 仍有 50% 不一致資料，系統性偏移縮小一半但不消失 |
+
+#### 建立資料集 repo
+
+```bash
+python -c "from huggingface_hub import HfApi; HfApi().create_repo(repo_id='RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist', repo_type='dataset', exist_ok=True)"
+```
+
+#### 錄製指令
+
+使用 `record_6btn_dual_cam_fixedwrist.sh`（repo_id 已設為 fixedwrist 版本）：
+
+```bash
+# 按鈕 1：第 1 集（初始化新資料集，resume=false）
+bash scripts/record_6btn_dual_cam_fixedwrist.sh 1 1 false
+
+# 按鈕 1：剩餘 99 集
+bash scripts/record_6btn_dual_cam_fixedwrist.sh 1 99
+
+# 按鈕 2：100 集
+bash scripts/record_6btn_dual_cam_fixedwrist.sh 2 100
+
+# 按鈕 3：100 集
+bash scripts/record_6btn_dual_cam_fixedwrist.sh 3 100
+```
+
+#### 實際錄製狀況（v1 驗證版）
+
+| 按鈕 | 錄製集數 | wrist 固定 | 按壓品質 |
+|---|---|---|---|
+| button_1 | 50 集 | ✅ | 部分按在邊緣 |
+| button_2 | 50 集 | ✅ | 前 20 集按在邊緣，後 30 集正中央 |
+| button_3 | 未錄製 | — | — |
+
+以此資料先訓練驗證版（v1），目的是**確認 wrist 固定是否消除系統性偏移**。若成功率有明顯提升，再補錄完整 100 集 × 3 按鈕做最終版本。
+
+> button_2 前 20 集按壓位置偏邊緣，若發現模型落點不夠居中可考慮刪除，僅保留後 30 集較乾淨的資料。
+
+#### Stats 統計量驗證（固定效果反證）
+
+透過比較 `observation.state` 的 `std`（標準差）可直接反證 wrist 固定策略的實際效果——**std 越小代表該關節在所有示範中越一致**。
+
+查詢指令：
+```bash
+python -c "from huggingface_hub import hf_hub_download; import json; dl = hf_hub_download(repo_id='RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist', filename='meta/stats.json', repo_type='dataset'); s = json.load(open(dl))['observation.state']; print('mean:', [round(x,2) for x in s['mean']]); print('std: ', [round(x,2) for x in s['std']])"
+```
+
+結果（`state mean/std` 順序：shoulder_pan / shoulder_lift / elbow_flex / **wrist_flex** / **wrist_roll** / gripper）：
+```
+mean: [14.02, -81.07,  79.89, -45.28, -0.64, 2.03]
+std:  [20.38,  24.32,  26.32,  46.48,  1.20, 0.05]
+```
+
+與舊 `dualcam` 資料集比較：
+
+| 關節 | 舊 dualcam std | 新 fixedwrist std | 改善 | 說明 |
+|------|:---:|:---:|:---:|------|
+| shoulder_pan | 18.96° | 20.38° | ➡ 略差 | 走路徑略有不同 |
+| shoulder_lift | 34.80° | 24.32° | ✅ -30% | |
+| elbow_flex | 51.33° | 26.32° | ✅ -49% | |
+| **wrist_flex** | **58.57°** | **46.48°** | ⚠️ -20% | 仍偏大，固定效果有限 |
+| **wrist_roll** | **15.78°** | **1.2°** | ✅✅ **-92%** | 幾乎完全固定 |
+| gripper | 0.04° | 0.05° | ➡ 不變 | |
+
+**結論：**
+- `wrist_roll` 固定效果極佳（std 1.2°），這是 Wrist Camera 影像方向的旋轉軸，固定後相機視角一致性大幅提升，推測是 Loss 從 0.040 降至 0.026 的主要原因。
+- `wrist_flex` std 仍有 46.48°。這**不是**因為示範不一致，而是**有意的示範策略**：如前述，受限於 SO-100 馬達的重力限制，初始姿態必須將 `wrist_flex` 往上縮，開始移動後才先伸直 `wrist_flex`，再保持伸直狀態去按壓。這段從「縮著」到「伸直」的過程，貢獻了大部分的 std，這是合理的動態變化。
+
+
+
+#### 上傳資料集至 HuggingFace
+
+> [!IMPORTANT]
+> **此步驟不可遺漏。** 若只錄製不上傳，`meta/stats.json` 僅存在本地 cache，推論腳本無法從雲端自動下載正確的歸一化統計，導致實機推論失敗（手臂停在原地不動）。
+
+```bash
+python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset; LeRobotDataset('RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist').push_to_hub()"
+```
+
+上傳完成後，至 HuggingFace 確認 `meta/stats.json` 存在：
+```bash
+python -c "from huggingface_hub import hf_hub_download; dl = hf_hub_download(repo_id='RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist', filename='meta/stats.json', repo_type='dataset'); import json; s = json.load(open(dl)); print('state mean:', s.get('observation.state', {}).get('mean'))"
+```
+
+#### 訓練指令（v1 驗證版，2 顆按鈕）
+
+
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist" \
+  --policy.type="act" \
+  --policy.num_tasks=2 \
+  --policy.kl_weight=1.0 \
+  --policy.chunk_size=250 \
+  --policy.n_action_steps=250 \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_2_fixedwrist_v1" \
+  --job_name="act_te_btn_1_to_2_fixedwrist_v1"
+```
+
+#### 訓練指令（最終版，3 顆按鈕，待補錄完成）
+
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist" \
+  --policy.type="act" \
+  --policy.num_tasks=3 \
+  --policy.kl_weight=1.0 \
+  --policy.chunk_size=250 \
+  --policy.n_action_steps=250 \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_3_fixedwrist_v1" \
+  --job_name="act_te_btn_1_to_3_fixedwrist_v1"
+```
+
+#### 訓練成果分析（fixedwrist v1，2 顆按鈕，100K 步）
+
+- **訓練日誌**：[act_te_train_20260521_195642.log](../record/act_te_train_20260521_195642.log)
+- **WandB**：[lerobot-so101-elevator-te-dualcam / nj90paa2](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator-te-dualcam/runs/nj90paa2)
+
+此次為第七步的關鍵驗證訓練：以全新 `fixedwrist` 資料集（wrist 手腕姿態固定策略）取代舊的 `dualcam` 資料集，確認示範一致性提升是否能解決系統性偏移問題。
+
+**基本參數：**
+
+| 參數 | 數值 |
+|------|------|
+| `num_tasks` | **2**（button_1 / button_2 驗證版） |
+| `num_episodes` | 100（兩顆按鈕共 100 集） |
+| `num_frames` | 24,101 |
+| `num_learnable_params` / `num_total_params` | **52M / 52M**（FiLM 架構，無 DistilBERT） |
+| `kl_weight` | 1.0 |
+| `chunk_size` / `n_action_steps` | **250**（前版為 100，因示範時間約 7~8 秒延長） |
+| `batch_size` | 8（前版為 16，batch 減半） |
+| 訓練時長 | **10 小時整**（2026-05-21 19:56 → 2026-05-22 05:56） |
+| `updt_s` | **0.340 秒**（batch=8 使計算量降低，前版 0.564 秒） |
+
+**Loss 收斂曲線：**
+
+| Step | Loss | grdn | 備註 |
+|:----:|:----:|:----:|------|
+| 200 | 0.914 | 19.75 | 初始值遠低於前版（前版 ~6.0）；batch=8 且只有 2 任務 |
+| 5K | 0.140 | 13.0 | |
+| 20K | 0.076 | 8.1 | |
+| 40K | 0.048 | 6.5 | |
+| 60K | 0.037 | 5.5 | |
+| 80K | 0.029 | 4.9 | |
+| **100K** | **0.026~0.027** | **~4.5** | 最終收斂 |
+
+**與歷史版本比較：**
+
+| 模型 | Steps | 最終 Loss | 最終 grdn | num_tasks | 資料集 |
+|------|:-----:|:---------:|:---------:|:---------:|--------|
+| act_te v1 | 200K | 0.034 | 1.73 | 3 | dualcam，300 eps，wrist 不固定 |
+| act_te v2 | 100K | ~0.040 | ~4.5 | 3 | dualcam，300 eps，wrist 不固定 |
+| **fixedwrist v1** | **100K** | **0.026** | **~4.5** | **2** | **fixedwrist，100 eps，wrist 固定** |
+
+- **Loss 0.026 為本專案所有版本最低值**，比 act_te v1 200K（0.034）再低 23%。
+- 原因：wrist 固定後示範一致性大幅提升，CVAE decoder 不再面對衝突監督信號，收斂更乾淨。
+- **grdn 仍在 ~4.5**（未達 v1 200K 的 1.73），模型尚未完全收斂，若延長至 200K 預計可進一步改善。
+- Epoch 數約 33.19（前版 44.25），更少的 epoch 達到更低 Loss，確認資料品質提升效果顯著。
+
+**Dummy 測試（語言條件區辨）：**
+
+| 任務 | 總位移量 | 最大/最小比 |
+|:----:|:-------:|:-----------:|
+| task_0（button 1） | 13.28 | 1.16× |
+| task_1（button 2） | 15.36 | |
+
+1.16× 與 act_te v1 200K（1.14×）相當，Task Embedding 區辨正常。
+
+**上傳模型至 HuggingFace：**
+```bash
+python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v1'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_te_btn_1_to_2_fixedwrist_v1/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model'); print('✅ 上傳完成：', repo_id)"
+```
+
+#### 實機推論除錯（fixedwrist v1）
+
+**現象**：兩個按鈕指令（`--task 1` / `--task 2`）均停在初始角度，手臂完全不移動。
+
+**排查過程：**
+
+1. **[已排除] stationary detection 提前觸發**：加入 `--stop_patience 9999 --num_steps 400` 仍無改善，排除此原因。
+
+2. **[已確認根本原因] Stats 歸一化來源錯誤**：
+
+   推論腳本 `inference_act_te_dualcam.py` 的 stats 載入邏輯寫死指向舊資料集：
+   ```python
+   meta_path = "configs/stats_dualcam.json"       # ← 舊 dualcam 資料集的 stats
+   # fallback 下載來源：
+   repo_id = "RonLiao/lerobot-so101-elevator-6btn-dual-cam"  # ← 舊資料集！
+   ```
+   Dummy 測試確認載入的是錯誤的 stats：
+   ```
+   state mean: [27.58, -62.35, 42.71, -0.23, 0.94, 1.24]  ← 舊 dualcam 分布
+   ```
+   而 `fixedwrist` 資料集的 wrist_flex 固定在標準角度（接近 0°），與舊 stats 的 wrist_flex mean ≈ 49° 差距超過 2.7σ，完全超出訓練時的輸入分布。模型收到「不認識」的輸入 → 輸出接近零的動作 → 手臂停在原地。
+
+**修復方案：**
+
+新建專屬推論腳本 `scripts/inference_act_te_fixedwrist.py`。腳本首次執行時會自動從 HuggingFace 下載 `lerobot-so101-elevator-6btn-dual-cam-fixedwrist` 的 stats，快取至 `configs/stats_fixedwrist.json`（不覆蓋舊的 `stats_dualcam.json`），後續執行直接讀取快取。
+
+```bash
+# Dummy 測試（首次執行會自動下載 stats，確認 state mean 已正確反映 fixedwrist 分布）
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v1 \
+  --dummy
+
+# 實機推論
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v1 \
+  --task 1
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v1 \
+  --task 2
+```
+
+新腳本的可調參數（兩個新增項）：
+- `--stats_dataset`：指定下載 stats 的 HuggingFace 資料集（預設：`RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist`）
+- `--stats_cache`：指定本地快取路徑（預設：`configs/stats_fixedwrist.json`）
+
+> [!IMPORTANT]
+> 此問題揭示了一個通用規範：**每次建立新資料集訓練新模型後，必須使用對應的推論腳本或正確指定 `--stats_dataset`**，確保歸一化統計與訓練資料一致。日後若再換資料集，可直接用 `--stats_dataset` 和 `--stats_cache` 參數指定，不需要修改程式碼。
+
+#### 推論修復驗證（Dummy 測試）
+
+上傳資料集確保 `stats.json` 可被下載後，重新執行 Dummy 測試驗證推論腳本：
+
+```bash
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v1 \
+  --dummy
+```
+
+**驗證重點：**
+1. **載入正確 `state mean`**：推論腳本成功從雲端下載 stats，並顯示 `state mean: [14.02, -81.07, 79.89, -45.28, -0.64, 2.03]`，其中 `wrist_flex`（第 4 個數值）為 `-45.28`，與 `fixedwrist` 資料集的實際分布完全吻合，成功排除歸一化來源錯誤。
+2. **Task Embedding 區辨驗證**：給定正確的 stats 基準後，Dummy 測試顯示 `task_0` 總位移 14.05，`task_1` 總位移 15.26。最大/最小比為 **1.09×**。雖然比未載入 stats 時亂舞算出的數值小，但這反映了在正確歸一化分布下，模型對不同任務的真實區辨反應。
+
+確認推論環境已完全修復，且 stats 載入邏輯正常運作，現在可以正式進入實機驗證（`--task 1` 與 `--task 2`）確認按壓精度。
+
+---
+
+### 3. [最終解謎] 實機走到一半就停下，甚至每次固定偏移？（歸一化、FPS與閉環控制的連鎖反應）
+
+我們經歷了多次除錯，終於釐清了所有問題的終極真相！這裡解釋了為什麼 `fixedwrist v1` 會走到一半停下來，以及為什麼之前的 `act_te v2` 會有「固定偏移」的精度問題。
+
+#### 真相一：LeRobot 預設不需要影像歸一化
+稍早前為了修復推論，我嘗試在腳本中加入 `stats.json` 或是 ImageNet 的影像歸一化 `(img - mean) / std`。
+但這是一個**致命的錯誤**！我回頭檢查了 `LeRobotDataset` 的底層程式碼，發現在我們訓練時，資料集根本沒有對影像做任何正規化，而是直接餵給模型 `[0, 1]` 的原始像素值！
+當我們在推論腳本中硬加了歸一化後，反而把影像訊號給破壞了（放大成純雜訊），導致模型**完全瞎掉**。瞎掉的模型只能依靠當前關節角度瞎猜，於是給出了停在半空中的「平均軌跡」。
+**修復：** 已將兩個推論腳本的影像處理還原為純粹的 `[0, 1]` 轉換。
+
+#### 真相二：缺乏 FPS 控制導致馬達跟不上
+為什麼第一次推論（那時候還沒加錯誤的影像歸一化）依然會停在半空中？
+因為原本的腳本**沒有 FPS 控制**！在沒有 `time.sleep` 的情況下，Python 迴圈會以 GPU 推論的極限速度（大約 60~100 Hz）狂飆。
+250 步的軌跡指令，原本應該要花 8.3 秒慢慢走完，腳本卻在 2.5 秒內全塞給了機器人。Feetech 伺服馬達有物理速度極限，根本來不及跟上，等腳本 400 步跑完強制結束時，手臂實際上才走到一半。
+
+**等等，那為什麼之前的 `act_te v2` 腳本也沒有 FPS 控制，卻能碰到按鈕？**
+因為 `v2` 錄製時，手臂是一開始就朝向面板的（軌跡很短）。即便馬達跟不上，2.5 秒的時間也「勉強」足夠讓它滑到面板上。但 `fixedwrist v1` 的錄製是從「手腕收合」開始，必須先伸直再往前按，這段複雜的軌跡 2.5 秒根本走不完，所以就停在半空中了！
+**修復：** 已在推論迴圈加入 30Hz 的 `time.sleep`，給予馬達足夠的物理時間執行動作。
+
+#### 真相三：缺乏 Temporal Ensembling 導致開環誤差累積（v2 精度差的主因）
+ACT 模型論文最核心的靈魂是 **Temporal Ensembling（時間系集）**，也就是閉環控制。
+在先前的腳本中，這個功能並未開啟，導致模型在第 0 步看了一眼畫面後，就「閉著眼睛」瞎走接下來的 250 步（Open-Loop）。由於馬達不可避免會有微小的遲滯，開環執行會讓軌跡越偏越遠。這就是為什麼 `act_te v2` 每次都會有**固定偏移**的真正元兇！
+**修復：** 在腳本載入模型後，強制啟用 Temporal Ensembling。現在機器人會**每一幀（每秒 30 次）都睜開眼睛看畫面**，並重新修正未來的軌跡，徹底消除偏移與走一半的問題。
+
+```python
+# 啟用 Temporal Ensembling (ACT 閉環控制的核心)
+policy.config.temporal_ensemble_coeff = 0.01
+from policies.act_te.modeling_act import ACTTemporalEnsembler
+policy.temporal_ensembler = ACTTemporalEnsembler(0.01, policy.config.chunk_size)
+```
+
+現在，這些所有的關鍵修復（保留純 `[0, 1]` 影像、30Hz FPS 控制、開啟 Temporal Ensembling）都已經完整實作在我們新建的實驗腳本 `inference_act_te_fixedwrist.py` 中。
+舊版的 `inference_act_te_dualcam.py` 將維持原樣不做修改，作為過去除錯歷程的對照組。請直接使用 `inference_act_te_fixedwrist.py` 進行接下來的實機推論實驗！
+
+#### 真相四：chunk_size=250 是 fixedwrist v1 完全不動的根本原因
+
+即使套用以上三個修復（正確 stats、移除影像歸一化、30Hz FPS、Temporal Ensembling），`fixedwrist v1` 模型在實機推論時仍然完全不動。這揭示了一個更根本的訓練資料問題。
+
+**問題機制：Action Target Clamping**
+
+LeRobot 訓練 ACT 時，對每個 frame t 的 action target 是 frames [t, t+1, ..., t+chunk_size-1]。若 t 靠近 episode 末尾，超出邊界的 frame 會被「clamp to last frame」填充——即以 frame 299（手臂回初始位置的最終姿態）補足所有缺失值。
+
+本專案 `episode_time_s=10`（每集 300 幀），`chunk_size=250`：
+
+```
+frame t  |  有效 action frames       |  clamp 比例
+---------|--------------------------|------------
+t = 0    |  frames 0~249 (250 幀)   |  0%
+t = 50   |  frames 50~299 (250 幀)  |  0%
+t = 51   |  frames 51~299 + clamp 1 |  0.4%
+t = 100  |  frames 100~299 + clamp 50 | 20%
+t = 200  |  frames 200~299 + clamp 150 | 60%
+t = 299  |  frame 299 + clamp 249  |  99.6%
+```
+
+**結果：只有 frames 0~50（17% 的訓練樣本）是乾淨的。其餘 83% 的樣本，action target 尾段都充滿了「初始位置」的 clamp 值。**
+
+模型找到了 loss 最小化的捷徑：**「無論在哪個觀測，只要輸出『走向初始位置並停住』，loss 就很低。」** 這解釋了 Loss=0.026（本專案史上最低）的矛盾——不是學得好，而是「假收斂」。推論時，手臂收到初始位置的觀測，輸出「繼續待在初始位置 250 步」，完全不動。
+
+**與 chunk_size=100 的對比**（act_te dualcam v2，已驗證有效）：
+
+| chunk_size | episode 幀數 | 乾淨樣本比例 | 結果 |
+|---|---|---|---|
+| 250 | 300 | **17%** | ❌ 手臂完全不動（假收斂，Loss=0.026） |
+| 100 | 300 | **67%** | ✅ 手臂正常移動，TE 修正偏移 |
+
+**修復方案：以 chunk_size=100 重新訓練 fixedwrist v2**
+
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist" \
+  --policy.type="act" \
+  --policy.num_tasks=2 \
+  --policy.kl_weight=1.0 \
+  --policy.chunk_size=100 \
+  --policy.n_action_steps=100 \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_2_fixedwrist_v2" \
+  --job_name="act_te_btn_1_to_2_fixedwrist_v2"
+```
+
+#### 訓練成果分析（fixedwrist v2，2 顆按鈕，100K 步）
+
+- **訓練日誌**：[act_te_train_20260526_153357.log](../record/act_te_train_20260526_153357.log)
+- **WandB**：[lerobot-so101-elevator-te-dualcam / qhc5d6ok](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator-te-dualcam/runs/qhc5d6ok)
+
+此次為 chunk_size=250 假收斂問題確認後的關鍵修復訓練：將 `chunk_size` 從 250 改為 100，確保 67% 以上的訓練樣本不受 clamp 污染，讓模型真正學習軌跡動作，而非「預測初始位置」捷徑。
+
+**基本參數：**
+
+| 參數 | 數值 |
+|------|------|
+| `num_tasks` | **2**（button_1 / button_2） |
+| `num_episodes` | 100（兩顆按鈕共 100 集） |
+| `num_frames` | 24,101 |
+| `num_learnable_params` / `num_total_params` | **52M / 52M**（FiLM 架構，無 DistilBERT） |
+| `kl_weight` | 1.0 |
+| `chunk_size` / `n_action_steps` | **100**（前版 v1 為 250，造成假收斂） |
+| `batch_size` | 8 |
+| 訓練時長 | **8 小時 54 分鐘**（2026-05-26 15:34 → 2026-05-27 00:28） |
+| `updt_s` | **0.300 秒**（全程穩定，無波動） |
+
+**Loss 收斂曲線：**
+
+| Step | Loss | grdn | 備註 |
+|:----:|:----:|:----:|------|
+| 200 | 1.191 | 33.3 | 初始值（前版 v1 為 0.914） |
+| 1K | 0.462 | 26.7 | |
+| 5K | 0.198 | 15.8 | |
+| 10K | 0.159 | 12.9 | |
+| 20K | 0.124 | 9.4 | ✅ Checkpoint |
+| 40K | 0.081 | 7.9 | ✅ Checkpoint |
+| 60K | 0.061 | 6.6 | ✅ Checkpoint |
+| 80K | 0.049 | 5.6 | ✅ Checkpoint |
+| **100K** | **0.043** | **4.9** | ✅ 最終 Checkpoint |
+
+**與歷史版本比較：**
+
+| 模型 | Steps | 最終 Loss | 最終 grdn | chunk_size | 乾淨樣本比例 |
+|------|:-----:|:---------:|:---------:|:----------:|:----------:|
+| fixedwrist v1 | 100K | **0.026** ❌ | ~4.5 | 250 | 17%（假收斂） |
+| **fixedwrist v2** | **100K** | **0.043** ✅ | **4.9** | **100** | **67%（真實收斂）** |
+
+- **fixedwrist v2 最終 Loss 0.043 高於 v1 的 0.026**，這是正常現象：v1 靠 clamp 捷徑達到低 loss，v2 真正在學軌跡，loss 更誠實。
+- Gradient 4.9 與 v1 的 4.5 相近，代表模型在同等訓練量下均未完全飽和；若有需要可延長至 200K 步。
+- Epoch 數約 33（與 v1 相同資料集，epoch 數一致），確認資料集完整遍歷。
+
+**上傳模型至 HuggingFace：**
+
+```bash
+python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v2'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_te_btn_1_to_2_fixedwrist_v2/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model'); print('✅ 上傳完成：', repo_id)"
+```
+
+#### Dummy 測試（fixedwrist v2）
+
+上傳完成後執行 Dummy 測試，驗證任務區辨（Task Embedding）與 stats 載入是否正常：
+
+```bash
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v2 \
+  --dummy
+```
+
+**驗證重點：**
+1. **`state mean` 數值正確**：應反映 `fixedwrist` 資料集分布，`wrist_flex`（第 4 個數值）應接近 `-45`，確認 stats 載入來源無誤。
+2. **Task Embedding 區辨**：`task_0`（button 1）與 `task_1`（button 2）的總位移量應有差異，最大/最小比 > 1.05× 代表模型能區分兩個任務。
+
+| 項目 | 預期 | 實測 |
+|------|------|------|
+| `state mean` wrist_flex | 接近 -45 | **-45.28** ✅ |
+| task_0 總位移 | — | **0.33** |
+| task_1 總位移 | — | **0.31** |
+| 最大/最小比 | > 1.05× | **1.06×** ✅ |
+
+#### 實機推論（fixedwrist v2）
+
+```bash
+# 按鈕 1
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v2 \
+  --task 1
+
+# 按鈕 2
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v2 \
+  --task 2
+```
+
+**觀察重點：**
+- **手臂是否從初始位置開始移動**（v1 完全不動，v2 修復 chunk_size 後應正常啟動）
+- **是否到達正確按鈕位置**（fixedwrist 資料集 wrist_roll std 較低，末端精度應更一致）
+- **Temporal Ensembling 修正效果**：手臂軌跡是否平滑收斂，無明顯固定偏移
+
+**實測結果：❌ 手臂不動**
+
+實機推論後手臂停在初始角度完全不移動。Step 計數器顯示推論正常進行，但 action 輸出始終接近 action mean，TE 連續輸出相同值，第 ~15 步自動停止（disp < stop_threshold=0.001）。根本原因見下節「fixedwrist v2 不動問題：根本原因分析」。
+
+---
+
+### fixedwrist v2 不動問題：根本原因分析（2026-05-27）
+
+#### 症狀
+
+```
+Step    0  action=[-0.876 -1.529  1.684 -0.792] | FPS: 28.3
+Step    1  action=[-0.876 -1.529  1.684 -0.792] | FPS: 29.1
+⏹  Step 15: 連續 15 步靜止，自動停止。
+```
+
+- 手臂在 0.5 秒內就停止，完全沒有到達目標位置。
+- wrist_flex 需要從 -98° 移動到 0°（button 1）或 -45°（button 2），但輸出約 -47°（接近 action mean）。
+
+#### diag_only 離線診斷
+
+為不連接實體機器人就能分析模型行為，`inference_act_te_fixedwrist.py` 加入了 `--diag_only` 模式：
+
+```bash
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v2 \
+  --diag_only \
+  --task 1 \
+  --init_state -0.91 -98.36 99.82 -98.64 1.05 2.20
+```
+
+**診斷輸出（關鍵摘要）：**
+
+```
+📊 [diag_only] 模型預測完整 100-step 軌跡（每 10 步採樣）：
+
+  Step   0: [-0.876, -1.529,  1.684, -0.792, 1.194,  0.184]  (denorm: ...)
+  Step  10: [-0.876, -1.529,  1.685, -0.791, 1.194,  0.184]
+  Step  20: [-0.877, -1.530,  1.684, -0.791, 1.195,  0.185]
+  ... (全 100 步幾乎相同)
+
+  [raw normalized chunk[0]] = [-0.230, -0.203,  0.240, -0.057, 1.240, 0.200]
+  → 接近 0（= action mean），遠離 -1（= 當前初始狀態）
+
+  [chunk[0] vs 當前狀態比較]
+  wrist_flex:  chunk=-47.50°   state=-98.64°   diff=+51.14°
+                              → chunk 是 action mean（-44.82°），不是目標
+
+  [診斷] 若模型「複製當前狀態」，raw[0] 應≈ [-0.046, -0.199,  0.153, -1.154,  0.000,  0.023]
+  [實際] raw_chunk[0]                        = [-0.230, -0.203,  0.240, -0.057,  1.240,  0.200]
+  
+  距 copy_state 的距離 = 0.6249
+  距 action mean 的距離 = 0.3618
+  → ✅ 結論：模型輸出接近 action mean（不動），非複製初始狀態
+```
+
+**全程軌跡 wrist_flex（-98.64° → ?）：**
+
+| Step | wrist_flex | delta |
+|:----:|:----------:|:-----:|
+| 0 | -47.50° | +51.14° |
+| 10 | -47.50° | ≈0 |
+| 50 | -47.51° | ≈0 |
+| 99 | -47.51° | ≈0 |
+
+模型在 chunk 中幾乎輸出同一個值（action mean），整個 100-step 軌跡 wrist_flex 只有 **-3.65°** 的總位移（需要 99°）。
+
+#### 根本原因：kl_weight=1.0 + 50 eps/task = 退化解
+
+**VAE encoder 學習機制：**
+
+1. `kl_weight=1.0`（低懲罰）→ encoder 被允許將完整軌跡資訊塞進 latent z
+2. 訓練時 encoder 學到：z 編碼了「這個 episode 應該往哪個按鈕走」
+3. 但 **inference 時 z=0**（prior mean），等同於不提供任何軌跡資訊
+4. decoder 接收到 z=0 + task_embedding + visual features → 由於沒有 z 的引導，輸出 action mean
+
+**為什麼 dualcam v2（也是 kl_weight=1.0）能正常運作？**
+
+| 模型 | kl_weight | eps/task | 結果 |
+|------|:---------:|:--------:|------|
+| act_lc dualcam | 10.0 | 50 | ✅ 正常 |
+| act_te dualcam v1 | 10.0 | 100 | ✅ 正常 |
+| act_te dualcam v2 | **1.0** | **100** | ✅ 正常 |
+| act_te fixedwrist v1 | 10.0 | 50 | ❌ chunk_size 問題（已修） |
+| **act_te fixedwrist v2** | **1.0** | **50** | ❌ **action mean 退化** |
+
+dualcam v2 每個任務有 **100 集**資料，資料量是 fixedwrist 的 2 倍。資料量足夠時，decoder 的 visual features 路徑能獨立學到任務區辨，不需要 z 的幫助；z=0 的 inference 仍能正常輸出軌跡。
+
+**臨界點估計：~50 eps/task 對 kl_weight=1.0 來說不夠，≥100 eps/task 才安全。**
+
+#### 複合問題：TE stop_threshold 提前終止
+
+即使模型只輸出 action mean，手臂本身是在初始位置的，mean 值也與初始位置有些許差距，理論上手臂應該會動一點點。但因為：
+
+1. mean-predicting model 輸出幾乎相同 action（chunk 中每步差異 < 0.001°）
+2. Temporal Ensembling 合成的 action 連續步之間 disp ≈ 0
+3. `stop_threshold=0.001` 在第 ~15 步觸發停止
+
+結果手臂在 0.5 秒內就停止，連 action mean 位置都沒到達。
+
+#### 解決方案：fixedwrist v3 用 kl_weight=10.0 重訓
+
+不需要新增資料，直接用相同 dataset 以 `kl_weight=10.0` 重訓：
+
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist" \
+  --policy.type="act" \
+  --policy.num_tasks=2 \
+  --policy.kl_weight=10.0 \
+  --policy.chunk_size=100 \
+  --policy.n_action_steps=100 \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_2_fixedwrist_v3" \
+  --job_name="act_te_btn_1_to_2_fixedwrist_v3"
+```
+
+**與 v2 的唯一差異**：`kl_weight=10.0`（v2 為 1.0）
+
+#### kl_weight 使用規則（未來版本）
+
+| 資料量 | kl_weight 建議 |
+|--------|:-------------:|
+| ≥100 eps/task | 1.0 或 10.0 均可 |
+| ~50 eps/task | **必須用 10.0** |
+| <50 eps/task | **必須用 10.0** |
+
+> ⚠️ **警告**：kl_weight=1.0 在資料量不足時會靜默退化（訓練 loss 正常收斂，但 inference 輸出 action mean）。建議 fixedwrist 系列始終使用 `kl_weight=10.0` 以策安全。
+
+---
+
+### 第九步：act_te fixedwrist v3 訓練（kl_weight=10.0）
+
+根本原因確認後，以相同 dataset 重訓，唯一改動為 `kl_weight=10.0`。
+
+#### 訓練指令
+
+```bash
+python scripts/train_act_te.py \
+  --dataset.repo_id="RonLiao/lerobot-so101-elevator-6btn-dual-cam-fixedwrist" \
+  --policy.type="act" \
+  --policy.num_tasks=2 \
+  --policy.kl_weight=10.0 \
+  --policy.chunk_size=100 \
+  --policy.n_action_steps=100 \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project="lerobot-so101-elevator-te-dualcam" \
+  --output_dir="outputs/train/act_te_btn_1_to_2_fixedwrist_v3" \
+  --job_name="act_te_btn_1_to_2_fixedwrist_v3"
+```
+
+#### 訓練成果分析（fixedwrist v3，2 顆按鈕，100K 步）
+
+- **訓練日誌**：[act_te_train_20260527_191538.log](../record/act_te_train_20260527_191538.log)
+- **WandB**：[lerobot-so101-elevator-te-dualcam / gvk2kk8b](https://wandb.ai/ron-liao-nuwa-robotics/lerobot-so101-elevator-te-dualcam/runs/gvk2kk8b)
+
+**基本參數：**
+
+| 參數 | 數值 |
+|------|------|
+| `dataset` | `lerobot-so101-elevator-6btn-dual-cam-fixedwrist` |
+| `num_episodes` | 100（兩顆按鈕共 100 集） |
+| `num_frames` | 24,101 |
+| `num_learnable_params` / `num_total_params` | **52M / 52M** |
+| `kl_weight` | **10.0**（v2 為 1.0，此為關鍵修正） |
+| `chunk_size` / `n_action_steps` | 100 |
+| `batch_size` | 8 |
+| 訓練時長 | **8 小時 54 分鐘**（2026-05-27 19:15 → 2026-05-28 04:09） |
+| `updt_s` | **0.301 秒**（全程穩定） |
+
+**Loss 收斂曲線：**
+
+| Step | Loss | grdn | 備註 |
+|:----:|:----:|:----:|------|
+| 200 | 6.301 | 148.4 | 初始值高（KL 懲罰×10，符合預期） |
+| 1K | 1.891 | 68.3 | 快速下降 |
+| 5K | 0.383 | 28.1 | |
+| 10K | 0.201 | 17.6 | |
+| 20K | 0.135 | 11.8 | ✅ Checkpoint |
+| 40K | 0.086 | 8.3 | ✅ Checkpoint |
+| 60K | 0.066 | 6.9 | ✅ Checkpoint |
+| 80K | 0.053 | 5.8 | ✅ Checkpoint |
+| **100K** | **0.046** | **4.8** | ✅ 最終 Checkpoint |
+
+**與歷史版本比較：**
+
+| 模型 | kl_weight | chunk_size | 最終 Loss | 最終 grdn | 結果 |
+|------|:---------:|:----------:|:---------:|:---------:|------|
+| fixedwrist v1 | 10.0 | 250 | 0.026 ❌ | ~4.5 | 假收斂（clamp 捷徑） |
+| fixedwrist v2 | 1.0 | 100 | 0.043 ❌ | 4.9 | action mean 退化（inference 不動） |
+| **fixedwrist v3** | **10.0** | **100** | **0.046 ✅** | **4.8** | **正常收斂** |
+
+**分析：**
+
+- **初始 loss 6.301**（v2 為 1.191）：kl_weight=10 使 KL 項初始貢獻大，屬預期現象，非異常
+- **最終 loss 0.046 ≈ v2 的 0.043**：重建品質幾乎相同，最終 KL 懲罰並未壓制模型的表達能力
+- **最終 gradient 4.8 ≈ v2 的 4.9**：相同收斂程度，非過擬合
+- **v3 final loss 0.046 > v1 的 0.026**：v1 的低 loss 是假收斂（捷徑），v3 的 0.046 是真實學習軌跡的誠實 loss
+
+#### 上傳模型至 HuggingFace
+
+```bash
+python -c "from huggingface_hub import HfApi; api = HfApi(); repo_id = 'RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v3'; api.create_repo(repo_id=repo_id, repo_type='model', exist_ok=True); api.upload_folder(folder_path='outputs/train/act_te_btn_1_to_2_fixedwrist_v3/checkpoints/last/pretrained_model', repo_id=repo_id, repo_type='model'); print('✅ 上傳完成：', repo_id)"
+```
+
+#### Dummy 測試（fixedwrist v3）
+
+```bash
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v3 \
+  --dummy
+```
+
+**驗證重點：**
+1. `state mean` wrist_flex 應接近 `-45`（確認 stats_fixedwrist.json 正確載入）
+2. task_0 與 task_1 總位移差異應 > 1.05×
+
+| 項目 | 預期 | 實測 |
+|------|------|------|
+| `state mean` wrist_flex | 接近 -45 | **-45.28** ✅ |
+| task_0 總位移 | — | **0.88** |
+| task_1 總位移 | — | **0.93** |
+| 最大/最小比 | > 1.05× | **1.05×** ✅ |
+
+> **與 v2 對比**：v2 的總位移僅 0.33/0.31（接近 action mean，幾乎不動）；v3 的 0.88/0.93 顯著更高，說明 kl_weight=10.0 下 decoder 依賴 visual+task features 正確輸出軌跡，不再退化為 action mean。
+
+#### diag_only 離線診斷（fixedwrist v3）
+
+上傳後先用 diag_only 確認模型不再輸出 action mean：
+
+```bash
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v3 \
+  --diag_only \
+  --task 1 \
+  --init_state -0.91 -98.36 99.82 -98.64 1.05 2.20
+```
+
+**判斷標準：**
+- v2（退化）：`raw_chunk[0]` 接近 `[0, 0, 0, 0, 0, 0]`，距 action mean 距離 < 距 copy_state 距離
+- **v3（正常）：`raw_chunk[0]` 應有明顯非零值，wrist_flex chunk[0] 應接近目標角度（0° for btn1），而非 action mean（-44.82°）**
+
+**實測結果（task=1, init_state = episode 0 frame 0）：**
+
+| 指標 | v2（退化）| v3（本次）|
+|------|:---------:|:---------:|
+| wrist_flex chunk[0] | -47.50°（≈ action mean -44.82°）| **-57.71°**（距初始 +40.93°）|
+| raw wrist_flex | -0.057（≈ 0）| **-0.276** |
+| 距 action mean 距離 | 0.3618 | 0.4903 |
+| 距 copy_state 距離 | 0.6249 | 0.5527 |
+| 診斷結論 | ❌ 退化（明確接近 mean）| 🟡 borderline（差距極小）|
+
+**分析：**
+
+- v3 的 `raw_chunk[0]` wrist_flex = **-0.276**（v2 為 -0.057），偏離 action mean 明顯更大
+- wrist_flex 在 chunk[0] 已預測出 +40.93° 的位移（v2 僅 +2.68°）——模型確實在「想動」
+- 但距 action mean 距離（0.49）與距 copy_state 距離（0.55）非常接近，診斷工具判為 🟡
+
+**此 diag_only 結果的侷限：** 輸入影像為隨機雜訊。沒有真實視覺線索時，即使正常模型也可能因 visual features 無效而輸出偏向 mean 的結果。diag_only 主要用於排除「v2 那種完全退化（distance from mean 0.36，遠小於 0.62）」的情況——v3 的 0.49 vs 0.55 差距極小，不能判定退化。
+
+**結論：v3 顯著優於 v2（退化），但 diag_only 用隨機影像無法給出確定性答案。應進行實機推論做最終驗證。**
+
+#### 實機推論（fixedwrist v3）
+
+```bash
+# 按鈕 1
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v3 \
+  --task 1
+
+# 按鈕 2
+python scripts/inference_act_te_fixedwrist.py \
+  --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v3 \
+  --task 2
+```
+
+**觀察重點：**
+- **手臂是否從初始位置開始移動**（v2 完全不動，v3 修復 kl_weight 後應正常啟動）
+- **是否到達正確按鈕位置**（wrist_flex 需從 -98° → 0°(btn1) 或 -45°(btn2)）
+- **TE 是否正常運作**：action 輸出應在每步之間有明顯位移，不應在 step 15 就觸發 stop_threshold
+
+**實測結果：❌ 手臂幾乎不動（但失敗模式不同於 v2）**
+
+```
+Step 0: wrist_flex cmd=-85.92°（從初始 -98.70° 移動 +12.78°）
+Step 1: wrist_flex cmd=-89.26°（開始往回）
+Step 9: wrist_flex cmd=-97.36°
+Step 399: wrist_flex cmd=-98.72°（回到初始）
+```
+
+---
+
+### fixedwrist v3 不動問題：失敗機制分析（2026-05-28）
+
+#### v3 的失敗模式與 v2 不同
+
+| | v2（kl=1.0，退化）| v3（kl=10.0，本次）|
+|--|:-:|:-:|
+| chunk[0] wrist_flex | -47.50°（≈ action mean -44.82°）| **-85.92°**（從初始移動 +12.78°）|
+| chunk[10..99] wrist_flex | ≈ -47.50°（全部在 mean 附近）| **-98.79°**（全部在初始位置）|
+| 失敗機制 | 輸出 action mean（不動）| 第一步嘗試動，但 chunk 後半段預測回到初始位置 |
+| TE 結果 | step 15 觸發靜止停止 | TE 把 chunk[0] 的移動立即平均掉 |
+
+#### 根本原因一：chunk[1..99] 預測 copy_state
+
+kl_weight=10.0 成功迫使 decoder 不再輸出 action mean，但出現新問題：
+
+- **chunk[0]**（第一步）：raw_wf = -0.879，對應 -85.92°，有意義的移動 ✅
+- **chunk[10..99]**（後半段）：raw_wf ≈ -1.15，對應 -98.79°，即 copy_state（初始位置）❌
+
+decoder 在 z=0 + 只有 50 eps/task 的條件下，無法為整個 100-step chunk 維持正確的軌跡延伸。模型學到「第一步往前移」，但無力預測後續 90 步「繼續往按鈕移動」，退化為「待在初始位置」。
+
+#### 根本原因二：te_coeff=0.01 過小，TE 大量平均舊預測
+
+`te_coeff=0.01`（推論腳本預設值）極小，步驟 t 的 TE 輸出約等於過去 100 步所有預測的近等權平均：
+- 步驟 k 的預測權重 = exp(-0.01 × k)
+- 步驟 100 步前的預測，權重仍有 exp(-1) ≈ 37%
+
+chunk 中 99 步預測 -98.7°，只有 chunk[0] 預測 -85.92°。TE 立即將 step 1 拉回：
+```
+TE step 1 ≈ weighted_avg( chunk[0]_t1=-85.9°, chunk[1]_t0≈-92.6° ) ≈ -89.3° → 往初始方向走
+```
+
+相比之下，dualcam 推論腳本使用 `te_coeff=0.1`（10 倍），較快遺忘舊預測，能更好追蹤最近的 chunk[0] 移動。
+
+#### 解決方向
+
+**立即可試（不重訓）：**
+
+1. 調高 `te_coeff`（0.1 或更高），讓 TE 更快遺忘舊預測：
+
+   ```bash
+   python scripts/inference_act_te_fixedwrist.py \
+     --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v3 \
+     --task 1 \
+     --te_coeff 0.1
+   ```
+
+2. 完全關閉 TE（`--te_coeff 0`），讓模型每步只執行 chunk[0]：
+
+   ```bash
+   python scripts/inference_act_te_fixedwrist.py \
+     --repo_id RonLiao/so101-elevator-act-te-btn-1-to-2-fixedwrist-v3 \
+     --task 1 \
+     --te_coeff 0
+   ```
+
+**若調整 TE 無法解決（chunk 本身有問題）：**
+
+- chunk[1..99] 持續預測 copy_state 代表 decoder 在 z=0 條件下無力維持正確軌跡
+- 可考慮：補錄至每任務 100 集（提供更多訓練信號），或使用中間值 `kl_weight=5.0`
+
+**實測結果（te_coeff 調整後）：（待補）**
